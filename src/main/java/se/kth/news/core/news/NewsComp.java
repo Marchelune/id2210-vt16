@@ -17,6 +17,7 @@
  */
 package se.kth.news.core.news;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -68,7 +69,9 @@ public class NewsComp extends ComponentDefinition {
     private Identifier gradientOId;
     //*******************************INTERNAL_STATE*****************************
     private NewsView localNewsView;
-
+    private ArrayList<KAddress> currentNeighbours = new ArrayList<KAddress>();
+    private ArrayList<News> newsChain = new ArrayList<>();
+    
     public NewsComp(Init init) {
         selfAdr = init.selfAdr;
         logPrefix = "<nid:" + selfAdr.getId() + ">";
@@ -93,9 +96,17 @@ public class NewsComp extends ComponentDefinition {
     };
 
     private void updateLocalNewsView() {
-        localNewsView = new NewsView(selfAdr.getId(), 0);
+        localNewsView = new NewsView(selfAdr.getId(), newsChain.size());
         LOG.debug("{}informing overlays of new view", logPrefix);
         trigger(new OverlayViewUpdate.Indication<>(gradientOId, false, localNewsView.copy()), viewUpdatePort);
+    }
+    
+    private void broadcastToNeighbours(News news){
+    	for(KAddress neighbour : currentNeighbours ){
+    		KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, neighbour, Transport.UDP);
+    		KContentMsg msg = new BasicContentMsg(header, news);
+    		trigger(msg, networkPort);
+    	}
     }
 
     Handler handleCroupierSample = new Handler<CroupierSample<NewsView>>() {
@@ -105,10 +116,15 @@ public class NewsComp extends ComponentDefinition {
                 return;
             }
             Iterator<Identifier> it = castSample.publicSample.keySet().iterator();
-            KAddress partner = castSample.publicSample.get(it.next()).getSource();
-            KHeader header = new BasicHeader(selfAdr, partner, Transport.UDP);
-            KContentMsg msg = new BasicContentMsg(header, new Ping());
-            trigger(msg, networkPort);
+            currentNeighbours = new ArrayList<KAddress>();
+            while(it.hasNext()){
+            	KAddress partner = castSample.publicSample.get(it.next()).getSource();
+            	currentNeighbours.add(partner);
+//                KHeader header = new BasicHeader(selfAdr, partner, Transport.UDP);
+//                KContentMsg msg = new BasicContentMsg(header, new Ping());
+//                trigger(msg, networkPort);
+            }
+            
         }
     };
 
@@ -123,6 +139,17 @@ public class NewsComp extends ComponentDefinition {
         public void handle(LeaderUpdate event) {
         }
     };
+    
+    ClassMatchedHandler handleNews = new ClassMatchedHandler<News, KContentMsg<?, ?, News>>() {
+		@Override
+		public void handle(News content, KContentMsg<?, ?, News> context) {
+			LOG.info("{}received news from:{}", logPrefix, context.getHeader().getSource());
+			newsChain.add(content);
+			if(content.getTtl() == 0) return;
+			broadcastToNeighbours(content.copyWithLowerTTL());
+			updateLocalNewsView();
+		}
+	};
 
     ClassMatchedHandler handlePing
             = new ClassMatchedHandler<Ping, KContentMsg<?, ?, Ping>>() {
