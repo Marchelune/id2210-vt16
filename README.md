@@ -1,4 +1,7 @@
-# id2210-vt16
+# Reliable news dissemination over a gradient topology
+Project at KTH-ICT - teachers A. Ormenisan, J. Dowling.
+
+**[WORK IN PROGRESS]**
 
 How to run the simulation from command line:
  
