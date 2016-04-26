@@ -145,9 +145,9 @@ public class NewsComp extends ComponentDefinition {
 		public void handle(News content, KContentMsg<?, ?, News> context) {
 			LOG.info("{}received news from:{}", logPrefix, context.getHeader().getSource());
 			newsChain.add(content);
+			updateLocalNewsView();
 			if(content.getTtl() == 0) return;
 			broadcastToNeighbours(content.copyWithLowerTTL());
-			updateLocalNewsView();
 		}
 	};
 
