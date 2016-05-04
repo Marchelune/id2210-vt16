@@ -73,7 +73,7 @@ public class NewsComp extends ComponentDefinition {
     //*******************************INTERNAL_STATE*****************************
     private NewsView localNewsView;
     private ArrayList<KAddress> currentNeighbours = new ArrayList<KAddress>();
-    private ArrayList<News> newsChain = new ArrayList<>();
+    private ArrayList<News> newsChain;
     
     //****SIMULATION
     private int simulatedNewsCount;
@@ -97,12 +97,14 @@ public class NewsComp extends ComponentDefinition {
         newsTimeOut = config().getValue("newsTimeOut", Integer.class);
 
         gradientOId = init.gradientOId;
-
+        newsChain = new ArrayList<>();
+        
         subscribe(handleStart, control);
         subscribe(handleCroupierSample, croupierPort);
         subscribe(handleGradientSample, gradientPort);
         subscribe(handleLeader, leaderPort);
         subscribe(handleNews, networkPort);
+        subscribe(handleNewsTimer, timerPort);
     }
 
     Handler handleStart = new Handler<Start>() {
@@ -115,6 +117,11 @@ public class NewsComp extends ComponentDefinition {
     		trigger(spt, timerPort);
     		
             updateLocalNewsView();
+            
+        	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+            GlobalNewsStore newsStore = gv.getValue("simulation.newsstore", GlobalNewsStore.class);
+            
+            newsStore.Store.put(selfAdr, newsChain);
         }
     };
     
@@ -125,7 +132,7 @@ public class NewsComp extends ComponentDefinition {
 		@Override
 		public void handle(NewsTimeOut event) {
 			News newNews = new News("News " + simulatedNewsCount + " from " + selfAdr, BASE_TTL);
-			LOG.info("{}created new news:{}", logPrefix, newNews.toString());
+			LOG.debug("{}created new news:{}", logPrefix, newNews.toString());
 			broadcastToNeighbours(newNews);
 			newsChain.add(newNews);
 			simulatedNewsCount++;
@@ -134,7 +141,7 @@ public class NewsComp extends ComponentDefinition {
 
     private void updateLocalNewsView() {
         localNewsView = new NewsView(selfAdr.getId(), newsChain.size());
-        LOG.debug("{}informing overlays of new view", logPrefix);
+        LOG.debug("{}informing overlays of new view of size{}", logPrefix, newsChain.size());
         trigger(new OverlayViewUpdate.Indication<>(gradientOId, false, localNewsView.copy()), viewUpdatePort);
     }
     
@@ -180,14 +187,12 @@ public class NewsComp extends ComponentDefinition {
     ClassMatchedHandler handleNews = new ClassMatchedHandler<News, KContentMsg<?, ?, News>>() {
 		@Override
 		public void handle(News content, KContentMsg<?, ?, News> context) {
-			LOG.info("{}received news from:{}", logPrefix, context.getHeader().getSource());
+			LOG.debug("{}received news from:{}", logPrefix, context.getHeader().getSource());
 			newsChain.add(content);
 			updateLocalNewsView();
 			if(content.getTtl() == 0) return;
 			broadcastToNeighbours(content.copyWithLowerTTL());
 			updateLocalNewsView();
-			//Simu
-			addNewstoStore(content);
 
 		}
 	};
@@ -211,18 +216,6 @@ public class NewsComp extends ComponentDefinition {
                 }
             };
             
-    //Simu
-    private void addNewstoStore(News news) {
-    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
-        GlobalNewsStore newsStore = config().getValue("simulation.newsstore", GlobalNewsStore.class);
-        HashMap<KAddress, ArrayList<News>> Store = newsStore.Store;
-        ArrayList<News> newsList = newsStore.Store.get(selfAdr);
-        if(newsList == null){
-        	newsList = new ArrayList<News>();	
-        }
-        newsList.add(news);
-
-	};
 
 
     public static class Init extends se.sics.kompics.Init<NewsComp> {

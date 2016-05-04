@@ -17,18 +17,25 @@
  */
 package se.kth.news.sim;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
 import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation;
 import se.sics.kompics.simulator.adaptor.Operation1;
+import se.sics.kompics.simulator.adaptor.Operation2;
+import se.sics.kompics.simulator.adaptor.distributions.IntegerUniformDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
 import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
+import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
@@ -37,6 +44,18 @@ import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
  * @author Alex Ormenisan <aaor@kth.se>
  */
 public class ScenarioGen {
+	
+	 static Operation setupOp = new Operation<SetupEvent>() {
+	        public SetupEvent generate() {
+	            return new SetupEvent() {
+	                @Override
+	                public void setupGlobalView(GlobalView gv) {
+	                		gv.setValue("simulation.newsstore", new GlobalNewsStore());
+
+	                }
+	            };
+	        }
+	    };
 
     static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
         @Override
@@ -84,10 +103,10 @@ public class ScenarioGen {
         }
     };
 
-    static Operation1<StartNodeEvent, Integer> startNodeOp = new Operation1<StartNodeEvent, Integer>() {
+    static Operation2<StartNodeEvent, Integer, Integer> startNodeOp = new Operation2<StartNodeEvent, Integer, Integer>() {
 
         @Override
-        public StartNodeEvent generate(final Integer nodeId) {
+        public StartNodeEvent generate(final Integer nodeId, final Integer timer) {
             return new StartNodeEvent() {
                 KAddress selfAdr;
 
@@ -116,6 +135,7 @@ public class ScenarioGen {
                     nodeConfig.put("system.id", nodeId);
                     nodeConfig.put("system.seed", ScenarioSetup.getNodeSeed(nodeId));
                     nodeConfig.put("system.port", ScenarioSetup.appPort);
+                    nodeConfig.put("newsTimeOut", timer);
                     return nodeConfig;
                 }
             };
@@ -123,8 +143,15 @@ public class ScenarioGen {
     };
 
     public static SimulationScenario simpleBoot() {
+    	final Random rnd = new Random();
         SimulationScenario scen = new SimulationScenario() {
             {
+                StochasticProcess setup = new SimulationScenario.StochasticProcess() {
+                    {
+                        raise(1, setupOp);
+                    }
+                };
+                
                 StochasticProcess systemSetup = new StochasticProcess() {
                     {
                         eventInterArrivalTime(constant(1000));
@@ -139,12 +166,14 @@ public class ScenarioGen {
                 };
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
+                    	
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(100, startNodeOp, new BasicIntSequentialDistribution(1));
+                        raise(10, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,10000,rnd));
                     }
                 };
-
+                setup.start();
                 systemSetup.start();
+                
                 startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
                 terminateAfterTerminationOf(1000*1000, startPeers);

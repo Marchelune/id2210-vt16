@@ -8,7 +8,7 @@ import se.sics.ktoolbox.util.network.KAddress;
 
 public class GlobalNewsStore {
 
-	public HashMap<KAddress, ArrayList<News>> Store;
+	public HashMap<KAddress, ArrayList<News>> Store = new HashMap<KAddress, ArrayList<News>>();
 	
 	public GlobalNewsStore (){
 		Store = new HashMap<KAddress, ArrayList<News>>();
