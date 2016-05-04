@@ -9,7 +9,7 @@ package se.kth.news.core.news;
 public class News {
 	
 	private final String title;
-	private int ttl;
+	private final int ttl;
 	
 	public News(String title, int ttl) {
 		this.title = title;
@@ -32,6 +32,13 @@ public class News {
 	public boolean equals(News news){
 		return title.equals(news.getTitle());
 	}
+
+	@Override
+	public String toString() {
+		return title;
+	}
+	
+	
 	
 	
 

@@ -35,7 +35,7 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
-import se.sics.kompics.timer.Timer;
+import se.sics.kompics.timer.*;
 import se.sics.ktoolbox.croupier.CroupierPort;
 import se.sics.ktoolbox.croupier.event.CroupierSample;
 import se.sics.ktoolbox.gradient.GradientPort;
@@ -72,10 +72,26 @@ public class NewsComp extends ComponentDefinition {
     private ArrayList<KAddress> currentNeighbours = new ArrayList<KAddress>();
     private ArrayList<News> newsChain = new ArrayList<>();
     
+    //****SIMULATION
+    private int simulatedNewsCount;
+    private final static int BASE_TTL = 10;
+    private int newsTimeOut;
+
+
+    
+    private static class  NewsTimeOut extends Timeout{
+		protected NewsTimeOut(SchedulePeriodicTimeout request) {
+			super(request);
+		}
+    }
+    
     public NewsComp(Init init) {
         selfAdr = init.selfAdr;
         logPrefix = "<nid:" + selfAdr.getId() + ">";
         LOG.info("{}initiating...", logPrefix);
+        
+        simulatedNewsCount = 0;
+        newsTimeOut = config().getValue("newsTimeOut", Integer.class);
 
         gradientOId = init.gradientOId;
 
@@ -83,17 +99,35 @@ public class NewsComp extends ComponentDefinition {
         subscribe(handleCroupierSample, croupierPort);
         subscribe(handleGradientSample, gradientPort);
         subscribe(handleLeader, leaderPort);
-        subscribe(handlePing, networkPort);
-        subscribe(handlePong, networkPort);
+        subscribe(handleNews, networkPort);
     }
 
     Handler handleStart = new Handler<Start>() {
         @Override
         public void handle(Start event) {
             LOG.info("{}starting...", logPrefix);
+            SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(300, newsTimeOut);
+    		Timeout timeout = new NewsTimeOut(spt);
+    		spt.setTimeoutEvent(timeout);
+    		trigger(spt, timerPort);
+    		
             updateLocalNewsView();
         }
     };
+    
+    /**
+     * simulation : generate a new news and broadcast it
+     */
+    Handler<NewsTimeOut> handleNewsTimer = new Handler<NewsComp.NewsTimeOut>() {
+		@Override
+		public void handle(NewsTimeOut event) {
+			News newNews = new News("News " + simulatedNewsCount + " from " + selfAdr, BASE_TTL);
+			LOG.info("{}created new news:{}", logPrefix, newNews.toString());
+			broadcastToNeighbours(newNews);
+			newsChain.add(newNews);
+			simulatedNewsCount++;
+		}
+	};
 
     private void updateLocalNewsView() {
         localNewsView = new NewsView(selfAdr.getId(), newsChain.size());
@@ -151,24 +185,6 @@ public class NewsComp extends ComponentDefinition {
 		}
 	};
 
-    ClassMatchedHandler handlePing
-            = new ClassMatchedHandler<Ping, KContentMsg<?, ?, Ping>>() {
-
-                @Override
-                public void handle(Ping content, KContentMsg<?, ?, Ping> container) {
-                    LOG.info("{}received ping from:{}", logPrefix, container.getHeader().getSource());
-                    trigger(container.answer(new Pong()), networkPort);
-                }
-            };
-
-    ClassMatchedHandler handlePong
-            = new ClassMatchedHandler<Pong, KContentMsg<?, KHeader<?>, Pong>>() {
-
-                @Override
-                public void handle(Pong content, KContentMsg<?, KHeader<?>, Pong> container) {
-                    LOG.info("{}received pong from:{}", logPrefix, container.getHeader().getSource());
-                }
-            };
 
     public static class Init extends se.sics.kompics.Init<NewsComp> {
 
