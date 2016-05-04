@@ -18,6 +18,7 @@
 package se.kth.news.core.news;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import se.kth.news.core.leader.LeaderUpdate;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.play.Ping;
 import se.kth.news.play.Pong;
+import se.kth.news.sim.GlobalNewsStore;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
@@ -35,6 +37,7 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
+import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.croupier.CroupierPort;
 import se.sics.ktoolbox.croupier.event.CroupierSample;
@@ -48,6 +51,7 @@ import se.sics.ktoolbox.util.network.basic.BasicContentMsg;
 import se.sics.ktoolbox.util.network.basic.BasicHeader;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdate;
 import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdatePort;
+import simon.sormain.KeyValueStore.network.TAddress;
 
 /**
  * @author Alex Ormenisan <aaor@kth.se>
@@ -148,6 +152,9 @@ public class NewsComp extends ComponentDefinition {
 			if(content.getTtl() == 0) return;
 			broadcastToNeighbours(content.copyWithLowerTTL());
 			updateLocalNewsView();
+			//Simu
+			addNewstoStore(content);
+
 		}
 	};
 
@@ -169,6 +176,21 @@ public class NewsComp extends ComponentDefinition {
                     LOG.info("{}received pong from:{}", logPrefix, container.getHeader().getSource());
                 }
             };
+            
+    //Simu
+    private void addNewstoStore(News news) {
+    	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+        GlobalNewsStore newsStore = config().getValue("simulation.newsstore", GlobalNewsStore.class);
+        HashMap<KAddress, ArrayList<News>> Store = newsStore.Store;
+        ArrayList<News> newsList = newsStore.Store.get(selfAdr);
+        if(newsList == null){
+        	newsList = new ArrayList<News>();	
+        }
+        newsList.add(news);
+                
+        gv.setValue("simulation.leader1", currentLeader);
+
+    }
 
     public static class Init extends se.sics.kompics.Init<NewsComp> {
 
