@@ -168,7 +168,7 @@ public class ScenarioGen {
                     {
                     	
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(10, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,10000,rnd));
+                        raise(10, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(3000,10000,rnd));
                     }
                 };
                 setup.start();

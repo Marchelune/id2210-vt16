@@ -20,6 +20,7 @@ package se.kth.news.core.news;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,7 +74,7 @@ public class NewsComp extends ComponentDefinition {
     //*******************************INTERNAL_STATE*****************************
     private NewsView localNewsView;
     private ArrayList<KAddress> currentNeighbours = new ArrayList<KAddress>();
-    private ArrayList<News> newsChain;
+    private LinkedHashSet<News> newsChain;
     
     //****SIMULATION
     private int simulatedNewsCount;
@@ -97,7 +98,7 @@ public class NewsComp extends ComponentDefinition {
         newsTimeOut = config().getValue("newsTimeOut", Integer.class);
 
         gradientOId = init.gradientOId;
-        newsChain = new ArrayList<>();
+        newsChain = new LinkedHashSet<>();
         
         subscribe(handleStart, control);
         subscribe(handleCroupierSample, croupierPort);
@@ -121,7 +122,8 @@ public class NewsComp extends ComponentDefinition {
         	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
             GlobalNewsStore newsStore = gv.getValue("simulation.newsstore", GlobalNewsStore.class);
             
-            newsStore.Store.put(selfAdr, newsChain);
+            //Simulation
+            newsStore.Store.put(selfAdr, newsChain.toArray(new News[newsChain.size()]));
         }
     };
     
@@ -141,7 +143,7 @@ public class NewsComp extends ComponentDefinition {
 
     private void updateLocalNewsView() {
         localNewsView = new NewsView(selfAdr.getId(), newsChain.size());
-        LOG.debug("{}informing overlays of new view of size{}", logPrefix, newsChain.size());
+        LOG.debug("{}informing overlays of new view of size {}", logPrefix, newsChain.size());
         trigger(new OverlayViewUpdate.Indication<>(gradientOId, false, localNewsView.copy()), viewUpdatePort);
     }
     
@@ -187,7 +189,8 @@ public class NewsComp extends ComponentDefinition {
     ClassMatchedHandler handleNews = new ClassMatchedHandler<News, KContentMsg<?, ?, News>>() {
 		@Override
 		public void handle(News content, KContentMsg<?, ?, News> context) {
-			LOG.debug("{}received news from:{}", logPrefix, context.getHeader().getSource());
+			if(newsChain.contains(content)) return;
+			LOG.debug("{} received new news from node {}", logPrefix, context.getHeader().getSource().getId());
 			newsChain.add(content);
 			updateLocalNewsView();
 			if(content.getTtl() == 0) return;

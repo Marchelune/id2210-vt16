@@ -29,17 +29,21 @@ public class News {
 		return ttl;
 	}
 	
-	public boolean equals(News news){
-		return title.equals(news.getTitle());
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof News)) return false;
+		News news = (News) obj;
+		return news.getTitle().equals(title);
 	}
 
 	@Override
 	public String toString() {
 		return title;
 	}
-	
-	
-	
-	
+
+	@Override
+	public int hashCode() {
+		return title.hashCode();
+	}
 
 }
