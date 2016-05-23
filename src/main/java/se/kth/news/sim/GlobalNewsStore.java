@@ -1,6 +1,5 @@
 package se.kth.news.sim;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 
@@ -9,7 +8,7 @@ import se.sics.ktoolbox.util.network.KAddress;
 
 public class GlobalNewsStore {
 
-	public HashMap<KAddress, News[]> Store = new HashMap<KAddress, News[]>();
+	public HashMap<KAddress, LinkedHashSet<News>> Store = new HashMap<KAddress, LinkedHashSet<News>>();
 	
 	
 }

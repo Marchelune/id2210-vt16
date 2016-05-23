@@ -25,11 +25,13 @@ import java.util.Random;
 
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
 import se.kth.news.system.HostMngrComp;
+import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
 import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation;
 import se.sics.kompics.simulator.adaptor.Operation1;
 import se.sics.kompics.simulator.adaptor.Operation2;
+import se.sics.kompics.simulator.adaptor.distributions.ConstantDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.IntegerUniformDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
 import se.sics.kompics.simulator.events.system.SetupEvent;
@@ -39,6 +41,7 @@ import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.ktoolbox.omngr.bootstrap.BootstrapServerComp;
 import se.sics.ktoolbox.util.network.KAddress;
 import se.sics.ktoolbox.util.overlays.id.OverlayIdRegistry;
+import static java.lang.Math.toIntExact;
 
 /**
  * @author Alex Ormenisan <aaor@kth.se>
@@ -52,6 +55,41 @@ public class ScenarioGen {
 	                public void setupGlobalView(GlobalView gv) {
 	                		gv.setValue("simulation.newsstore", new GlobalNewsStore());
 
+	                }
+	            };
+	        }
+	    };
+	    
+	    static Operation1 startObserverOp = new Operation1<StartNodeEvent, Long>() {
+	        public StartNodeEvent generate(final Long nodeId) {
+	            return new StartNodeEvent() {
+	            	KAddress selfAdr;
+	            	int nodeIdInt = toIntExact(nodeId);
+
+	                {
+	                	selfAdr = ScenarioSetup.getNodeAdr(nodeIdInt);
+	                }
+
+	                @Override
+	                public Map<String, Object> initConfigUpdate() {
+	                    HashMap<String, Object> config = new HashMap<String, Object>();
+	                    config.put("simulation.checktimeout", 1000);
+	                    return config;
+	                }
+	                
+	                @Override
+	                public Address getNodeAddress() {
+	                    return selfAdr;
+	                }
+
+	                @Override
+	                public Class getComponentDefinition() {
+	                    return SimulationObserverTask1.class;
+	                }
+
+	                @Override
+	                public Init getComponentInit() {
+	                    return Init.NONE;
 	                }
 	            };
 	        }
@@ -164,11 +202,18 @@ public class ScenarioGen {
                         raise(1, startBootstrapServerOp);
                     }
                 };
+                
+                SimulationScenario.StochasticProcess startObserver = new SimulationScenario.StochasticProcess() {
+                    {
+                    	eventInterArrivalTime(constant(1000));
+                        raise(1, startObserverOp, constant(0));
+                    }
+                };
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
                     	
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(10, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(3000,10000,rnd));
+                        raise(2, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(50000,100000,rnd));
                     }
                 };
                 setup.start();
@@ -176,6 +221,7 @@ public class ScenarioGen {
                 
                 startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
+                startObserver.startAfterTerminationOf(1, startPeers);
                 terminateAfterTerminationOf(1000*1000, startPeers);
             }
         };

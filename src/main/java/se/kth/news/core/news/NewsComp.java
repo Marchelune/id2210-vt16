@@ -123,7 +123,7 @@ public class NewsComp extends ComponentDefinition {
             GlobalNewsStore newsStore = gv.getValue("simulation.newsstore", GlobalNewsStore.class);
             
             //Simulation
-            newsStore.Store.put(selfAdr, newsChain.toArray(new News[newsChain.size()]));
+            newsStore.Store.put(selfAdr, newsChain);
         }
     };
     
@@ -137,6 +137,7 @@ public class NewsComp extends ComponentDefinition {
 			LOG.debug("{}created new news:{}", logPrefix, newNews.toString());
 			broadcastToNeighbours(newNews);
 			newsChain.add(newNews);
+			// Update local news view ?
 			simulatedNewsCount++;
 		}
 	};
@@ -195,7 +196,7 @@ public class NewsComp extends ComponentDefinition {
 			updateLocalNewsView();
 			if(content.getTtl() == 0) return;
 			broadcastToNeighbours(content.copyWithLowerTTL());
-			updateLocalNewsView();
+			updateLocalNewsView(); // Why twice ?
 
 		}
 	};
