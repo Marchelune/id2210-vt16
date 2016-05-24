@@ -40,6 +40,6 @@ public class NewsView implements View {
     
     @Override
     public String toString() {
-        return "News<" + nodeId + ">";
+        return "News<" + nodeId + "; size "+ localNewsCount + ">";
     }
 }
