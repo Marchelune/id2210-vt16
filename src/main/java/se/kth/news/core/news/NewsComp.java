@@ -112,7 +112,7 @@ public class NewsComp extends ComponentDefinition {
         @Override
         public void handle(Start event) {
             LOG.info("{}starting...", logPrefix);
-            SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(300, newsTimeOut);
+            SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(10000, newsTimeOut);
     		Timeout timeout = new NewsTimeOut(spt);
     		spt.setTimeoutEvent(timeout);
     		trigger(spt, timerPort);
@@ -138,6 +138,7 @@ public class NewsComp extends ComponentDefinition {
 			broadcastToNeighbours(newNews);
 			newsChain.add(newNews);
 			// Update local news view ?
+			updateLocalNewsView();
 			simulatedNewsCount++;
 		}
 	};

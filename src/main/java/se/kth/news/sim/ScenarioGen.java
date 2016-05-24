@@ -173,7 +173,8 @@ public class ScenarioGen {
                     nodeConfig.put("system.id", nodeId);
                     nodeConfig.put("system.seed", ScenarioSetup.getNodeSeed(nodeId));
                     nodeConfig.put("system.port", ScenarioSetup.appPort);
-                    nodeConfig.put("newsTimeOut", timer);
+                    int test = 5000000;
+                    nodeConfig.put("newsTimeOut", test);
                     return nodeConfig;
                 }
             };
@@ -213,7 +214,7 @@ public class ScenarioGen {
                     {
                     	
                         eventInterArrivalTime(uniform(1000, 1100));
-                        raise(2, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(50000,100000,rnd));
+                        raise(20, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(50000,100000,rnd));
                     }
                 };
                 setup.start();
@@ -222,7 +223,7 @@ public class ScenarioGen {
                 startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
                 startObserver.startAfterTerminationOf(1, startPeers);
-                terminateAfterTerminationOf(1000*1000, startPeers);
+                terminateAfterTerminationOf(10000000, startPeers);
             }
         };
 

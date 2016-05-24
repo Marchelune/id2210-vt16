@@ -127,7 +127,9 @@ private static final Logger LOG = LoggerFactory.getLogger(SimulationObserverTask
     		LOG.info(" Node Knowledge: The node '{}' has the list {} .\n", addr.toString(), newsSet);
     		// Number of news the node has
     		int nbNews = newsSet.size();
-    		LOG.info(" Node Knowledge: The node '{}' has received {} % of the news.\n", addr.toString(), (nbNews*100/totalNbNews));
+    		if(totalNbNews > 0){
+    			LOG.info(" Node Knowledge: The node '{}' has received {} % of the news.\n", addr.toString(), (nbNews*100/totalNbNews));
+    		}
     	}
     }
 }
