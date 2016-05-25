@@ -222,7 +222,7 @@ public class ScenarioGen {
                 
                 startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
-                startObserver.startAfterTerminationOf(1, startPeers);
+                //startObserver.startAfterTerminationOf(1, startPeers);
                 terminateAfterTerminationOf(10000000, startPeers);
             }
         };
