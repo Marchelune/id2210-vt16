@@ -10,15 +10,17 @@ public class News {
 	
 	private final String title;
 	private final int ttl;
+	private final int timestamp;
 	
-	public News(String title, int ttl) {
+	public News(String title, int ttl, int timestamp) {
 		this.title = title;
 		this.ttl = ttl;
+		this.timestamp = timestamp;
 	}
 	
 	public News copyWithLowerTTL(){
 		if(ttl==0) return null;
-		return new News(title,ttl-1);
+		return new News(title,ttl-1, timestamp);
 	}
 
 	public String getTitle() {
@@ -39,6 +41,12 @@ public class News {
 	@Override
 	public String toString() {
 		return title;
+	}
+	
+	
+
+	public int getTimestamp() {
+		return timestamp;
 	}
 
 	@Override

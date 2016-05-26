@@ -45,162 +45,157 @@ import se.sics.ktoolbox.util.network.basic.BasicHeader;
 import se.sics.ktoolbox.util.other.Container;
 
 /**
- * @author Alex Ormenisan <aaor@kth.se>
+ * @author Rémi Sormain
  */
 public class LeaderSelectComp extends ComponentDefinition {
 
-    private static final Logger LOG = LoggerFactory.getLogger(LeaderSelectComp.class);
-    private String logPrefix = " ";
+	private static final Logger LOG = LoggerFactory.getLogger(LeaderSelectComp.class);
+	private String logPrefix = " ";
 
-    //*******************************CONNECTIONS********************************
-    Positive<Timer> timerPort = requires(Timer.class);
-    Positive<Network> networkPort = requires(Network.class);
-    Positive<GradientPort> gradientPort = requires(GradientPort.class);
-    Negative<LeaderSelectPort> leaderUpdate = provides(LeaderSelectPort.class);
-    //*******************************EXTERNAL_STATE*****************************
-    private KAddress selfAdr;
-    //*******************************INTERNAL_STATE*****************************
-    private Comparator<NewsView> viewComparator;
-    private List<KAddress> currentNeighboursSample;
-    private List<KAddress> currentFingersSample;
-    
-    private int stableConsecutiveRounds;
-    private static final int STABILITY_ROUNDS_THRESHOLD = 5; //number of rounds before gradient is considered stable
-    private static final double STABILITY_DISPARITY_THRESHOLD = 0.8;
-    
-    private NewsView currentLocalView;
-    
-  
-    private KAddress currentLeader;
-    
-    private List<KAddress> quorum;
-    private int receivedVotes;
-    private boolean isCandidate;
+	//*******************************CONNECTIONS********************************
+	Positive<Timer> timerPort = requires(Timer.class);
+	Positive<Network> networkPort = requires(Network.class);
+	Positive<GradientPort> gradientPort = requires(GradientPort.class);
+	Negative<LeaderSelectPort> leaderUpdate = provides(LeaderSelectPort.class);
+	//*******************************EXTERNAL_STATE*****************************
+	private KAddress selfAdr;
+	//*******************************INTERNAL_STATE*****************************
+	private Comparator<NewsView> viewComparator;
+	private List<KAddress> currentNeighboursSample;
+	private List<KAddress> currentFingersSample;
 
-    public LeaderSelectComp(Init init) {
-        selfAdr = init.selfAdr;
-        logPrefix = "<nid:" + selfAdr.getId() + ">";
-        LOG.info("{}initiating...", logPrefix);
-        
-        viewComparator = init.viewComparator; // viewComparator=viewComparator ??
-        currentLocalView = new NewsView(selfAdr.getId(), 0);
-        currentLeader = null;
-        
-        stableConsecutiveRounds=0;
-        
-        
-        subscribe(handleStart, control);
-        subscribe(handleGradientSample, gradientPort);
-        subscribe(handleElectionRequest, networkPort);
-        subscribe(handleVote, networkPort);
-        subscribe(handleLeaderUpdate, networkPort);
-    }
-    
-    /**
-     * Update the neighbours sample and check for stability in the gradient
-     * 
-     * @return true if the gradient is stable enough to try an election
-     */
-    private boolean gradientIsStable(List<Container<KAddress, NewsView>> newNeighboursSample){
-    	
-    	ArrayList<KAddress> tempSample = new ArrayList<>();
-    	for(Container<KAddress, ?> nb : newNeighboursSample){
-    		tempSample.add(nb.getSource());
-    	}
-    	
-    	if(currentNeighboursSample==null || currentNeighboursSample.size() != tempSample.size() ) {
-    		stableConsecutiveRounds =0;
-    		currentNeighboursSample = tempSample;
-    		LOG.debug("{} says : Gradient not stable !", logPrefix);
-    		return false;
-    	}
-    	
-    	ArrayList<KAddress> difference = (ArrayList<KAddress>) tempSample.clone();
-    	difference.retainAll(currentNeighboursSample);
-    	double disparity = difference.size() / tempSample.size();
-    	if(disparity >= STABILITY_DISPARITY_THRESHOLD){
-    		stableConsecutiveRounds++;
-    	}else{
-    		//LOG.debug("{} says : Gradient not stable, disparity of {} after {} rounds !", logPrefix,disparity,stableConsecutiveRounds);
-    		stableConsecutiveRounds=0;
-    	}
-    	
-    	currentNeighboursSample = tempSample;
-    	return stableConsecutiveRounds >= STABILITY_ROUNDS_THRESHOLD ;
-    }
-    
-    private void broadcastToNodes(Object election, List<KAddress> nodes){
-    	for(KAddress neighbour : nodes ){
-    		KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, neighbour, Transport.UDP);
-    		KContentMsg msg = new BasicContentMsg(header, election);
-    		trigger(msg, networkPort);
-    	}
-    }
+	private int stableConsecutiveRounds;
+	private static final int STABILITY_ROUNDS_THRESHOLD = 5; //number of rounds before gradient is considered stable
+	private static final double STABILITY_DISPARITY_THRESHOLD = 0.8;
 
-    Handler handleStart = new Handler<Start>() {
-        @Override
-        public void handle(Start event) {
-            LOG.info("{}starting...", logPrefix);
-        }
-    };
-    
-    Handler handleGradientSample = new Handler<TGradientSample<NewsView>>() {
-        @Override
-        public void handle(TGradientSample<NewsView> sample) {
-//            LOG.debug("{}neighbours:{}", logPrefix, sample.gradientNeighbours);
-//            LOG.debug("{}fingers:{}", logPrefix, sample.gradientFingers);
-//            LOG.debug("{}local view:{}", logPrefix, sample.selfView);
-            List<Container<KAddress, NewsView>> newNeighboursSample = sample.getGradientNeighbours();
-            currentLocalView = sample.selfView;
-            
-            //TODO fingers update            
-            currentFingersSample = new ArrayList<>();
-            for( Container<KAddress, ?> fg : sample.gradientFingers){
-            	currentFingersSample.add(fg.getSource());
-            }
-            
-            if(!(currentLeader==null)) return; //already a leader, no need to check TODO maybe change the order later
-            
-            if(! gradientIsStable(newNeighboursSample)) return; //gradient not stable to perform election
-            LOG.debug("{} says : Gradient is stable !", logPrefix);
-            
-            
-            
-            for (Container<KAddress, NewsView> neighbour : newNeighboursSample){
-            	if(viewComparator.compare(neighbour.getContent(), currentLocalView ) > 0 ){
-            		return;
-            	}
-            }
-            
-            //none of our neighbours is above us
-            startElection();
-            
-        }
-    };
-    
-    /**
-     * triggered when the node believes he's the leader.
-     * Sends messages to its neighbours to be elected.
-     */
-    private void startElection(){
-    	LOG.debug("{} start an election", logPrefix);
-    	quorum = currentNeighboursSample;
-    	receivedVotes = 0;
-    	isCandidate= true;
-    	broadcastToNodes(new Election(selfAdr,currentLocalView), quorum);
-    }
-    
-    ClassMatchedHandler<Election, KContentMsg<?, ?, Election>> handleElectionRequest = new ClassMatchedHandler<Election, KContentMsg<?, ?, Election>>() {
+	private NewsView currentLocalView;
+
+
+	private KAddress currentLeader;
+
+	private List<KAddress> quorum;
+	private int receivedVotes;
+	private boolean isCandidate;
+
+	public LeaderSelectComp(Init init) {
+		selfAdr = init.selfAdr;
+		logPrefix = "<nid:" + selfAdr.getId() + ">";
+		LOG.info("{}initiating...", logPrefix);
+
+		viewComparator = init.viewComparator; // viewComparator=viewComparator ??
+		currentLocalView = new NewsView(selfAdr.getId(), 0);
+		currentLeader = null;
+
+		stableConsecutiveRounds=0;
+
+
+		subscribe(handleStart, control);
+		subscribe(handleGradientSample, gradientPort);
+		subscribe(handleElectionRequest, networkPort);
+		subscribe(handleVote, networkPort);
+		subscribe(handleLeaderUpdate, networkPort);
+	}
+
+	/**
+	 * Update the neighbours sample and check for stability in the gradient
+	 * 
+	 * @return true if the gradient is stable enough to try an election
+	 */
+	private boolean gradientIsStable(List<Container<KAddress, NewsView>> newNeighboursSample){
+
+		ArrayList<KAddress> tempSample = new ArrayList<>();
+		for(Container<KAddress, ?> nb : newNeighboursSample){
+			tempSample.add(nb.getSource());
+		}
+
+		if(currentNeighboursSample==null || currentNeighboursSample.size() != tempSample.size() ) {
+			stableConsecutiveRounds =0;
+			currentNeighboursSample = tempSample;
+			LOG.debug("{} says : Gradient not stable !", logPrefix);
+			return false;
+		}
+
+		ArrayList<KAddress> difference = (ArrayList<KAddress>) tempSample.clone();
+		difference.retainAll(currentNeighboursSample);
+		double disparity = difference.size() / tempSample.size();
+		if(disparity >= STABILITY_DISPARITY_THRESHOLD){
+			stableConsecutiveRounds++;
+		}else{
+			stableConsecutiveRounds=0;
+		}
+
+		currentNeighboursSample = tempSample;
+		return stableConsecutiveRounds >= STABILITY_ROUNDS_THRESHOLD ;
+	}
+
+	private void broadcastToNodes(Object election, List<KAddress> nodes){
+		for(KAddress neighbour : nodes ){
+			KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, neighbour, Transport.UDP);
+			KContentMsg msg = new BasicContentMsg(header, election);
+			trigger(msg, networkPort);
+		}
+	}
+
+	Handler handleStart = new Handler<Start>() {
+		@Override
+		public void handle(Start event) {
+			LOG.info("{}starting...", logPrefix);
+		}
+	};
+
+	Handler handleGradientSample = new Handler<TGradientSample<NewsView>>() {
+		@Override
+		public void handle(TGradientSample<NewsView> sample) {
+			//            LOG.debug("{}neighbours:{}", logPrefix, sample.gradientNeighbours);
+			//            LOG.debug("{}fingers:{}", logPrefix, sample.gradientFingers);
+			//            LOG.debug("{}local view:{}", logPrefix, sample.selfView);
+			List<Container<KAddress, NewsView>> newNeighboursSample = sample.getGradientNeighbours();
+			currentLocalView = sample.selfView;
+
+			//TODO fingers update            
+			currentFingersSample = new ArrayList<>();
+			for( Container<KAddress, ?> fg : sample.gradientFingers){
+				currentFingersSample.add(fg.getSource());
+			}
+
+			if(!(currentLeader==null)) return; //already a leader, no need to check TODO maybe change the order later
+
+			if(! gradientIsStable(newNeighboursSample)) return; //gradient not stable to perform election
+
+			for (Container<KAddress, NewsView> neighbour : newNeighboursSample){
+				if(viewComparator.compare(neighbour.getContent(), currentLocalView ) > 0 ){
+					return;
+				}
+			}
+			//none of our neighbours is above us
+			startElection();
+
+		}
+	};
+
+	/**
+	 * triggered when the node believes he's the leader.
+	 * Sends messages to its neighbours to be elected.
+	 */
+	private void startElection(){
+		LOG.debug("{} start an election", logPrefix);
+		quorum = currentNeighboursSample;
+		receivedVotes = 0;
+		isCandidate= true;
+		broadcastToNodes(new Election(selfAdr,currentLocalView), quorum);
+	}
+
+	ClassMatchedHandler<Election, KContentMsg<?, ?, Election>> handleElectionRequest = new ClassMatchedHandler<Election, KContentMsg<?, ?, Election>>() {
 		@Override
 		public void handle(Election content, KContentMsg<?, ?, Election> context) {
 			if(currentLeader!=null) return;			
-			
+
 			KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, context.getHeader().getSource(), Transport.UDP);
-    		KContentMsg msg = new BasicContentMsg(header, new Vote(content));
-    		trigger(msg, networkPort);
+			KContentMsg msg = new BasicContentMsg(header, new Vote(content));
+			trigger(msg, networkPort);
 		}
 	};
-	
+
 	ClassMatchedHandler<Vote, KContentMsg<?, ?, Vote>> handleVote = new ClassMatchedHandler<Vote, KContentMsg<?,?,Vote>>() {
 		@Override
 		public void handle(Vote content, KContentMsg<?, ?, Vote> context) {
@@ -213,10 +208,10 @@ public class LeaderSelectComp extends ComponentDefinition {
 				isCandidate =false;
 				trigger(new LeaderUpdate(selfAdr),leaderUpdate);
 			}
-			
+
 		}
 	};
-	
+
 	ClassMatchedHandler<LeaderUpdate, KContentMsg<?, ?, LeaderUpdate>> handleLeaderUpdate = new ClassMatchedHandler<LeaderUpdate, KContentMsg<?,?,LeaderUpdate>>() {
 		@Override
 		public void handle(LeaderUpdate content, KContentMsg<?, ?, LeaderUpdate> context) {
@@ -225,25 +220,28 @@ public class LeaderSelectComp extends ComponentDefinition {
 			broadcastToNodes(content, currentNeighboursSample);
 			broadcastToNodes(content, currentFingersSample);
 			trigger(content,leaderUpdate);
-			
-			//DEBUG
+
 			String nbs="";
 			for(KAddress nb : currentNeighboursSample){
 				nbs += " " + nb.getId() + " ";
 			}
-			
-			LOG.debug("{} knows a brand new leader : {}. Lets tell my neighbours : {}", logPrefix,currentLeader,nbs);
+			String fgs="";
+			for(KAddress fg : currentFingersSample){
+				fgs += " " + fg.getId() + " ";
+			}
+
+			LOG.debug("{} knows a brand new leader : {}. Lets tell \n my neighbours : {} \n my fingers : {}", logPrefix,currentLeader,nbs,fgs);
 		}
 	};
 
-    public static class Init extends se.sics.kompics.Init<LeaderSelectComp> {
+	public static class Init extends se.sics.kompics.Init<LeaderSelectComp> {
 
-        public final KAddress selfAdr;
-        public final NewsViewComparator viewComparator;
+		public final KAddress selfAdr;
+		public final NewsViewComparator viewComparator;
 
-        public Init(KAddress selfAdr, NewsViewComparator viewComparator) {
-            this.selfAdr = selfAdr;
-            this.viewComparator = viewComparator;
-        }
-    }
+		public Init(KAddress selfAdr, NewsViewComparator viewComparator) {
+			this.selfAdr = selfAdr;
+			this.viewComparator = viewComparator;
+		}
+	}
 }

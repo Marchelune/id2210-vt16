@@ -173,8 +173,8 @@ public class ScenarioGen {
                     nodeConfig.put("system.id", nodeId);
                     nodeConfig.put("system.seed", ScenarioSetup.getNodeSeed(nodeId));
                     nodeConfig.put("system.port", ScenarioSetup.appPort);
-                    int test = 5000000;
-                    nodeConfig.put("newsTimeOut", test);
+                    
+                    nodeConfig.put("newsTimeOut", timer);
                     return nodeConfig;
                 }
             };
@@ -213,8 +213,8 @@ public class ScenarioGen {
                 StochasticProcess startPeers = new StochasticProcess() {
                     {
                     	
-                        eventInterArrivalTime(uniform(1000, 1100));
-                        raise(20, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(50000,100000,rnd));
+                        eventInterArrivalTime(uniform(1, 50));
+                        raise(20, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(4000,10000,rnd));
                     }
                 };
                 setup.start();
@@ -223,7 +223,7 @@ public class ScenarioGen {
                 startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
                 startPeers.startAfterTerminationOf(1000, startBootstrapServer);
                 //startObserver.startAfterTerminationOf(1, startPeers);
-                terminateAfterTerminationOf(10000000, startPeers);
+                terminateAfterTerminationOf(45000, startPeers);
             }
         };
 
