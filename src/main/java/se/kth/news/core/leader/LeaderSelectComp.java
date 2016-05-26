@@ -70,9 +70,11 @@ public class LeaderSelectComp extends ComponentDefinition {
     Handler handleGradientSample = new Handler<TGradientSample>() {
         @Override
         public void handle(TGradientSample sample) {
-            LOG.debug("{}neighbours:{}", logPrefix, sample.gradientNeighbours);
-            LOG.debug("{}fingers:{}", logPrefix, sample.gradientFingers);
-            LOG.debug("{}local view:{}", logPrefix, sample.selfView);
+            //LOG.debug("{}neighbours:{}", logPrefix, sample.gradientNeighbours);
+            //LOG.debug("{}fingers:{}", logPrefix, sample.gradientFingers);
+            //LOG.debug("{}local view:{}", logPrefix, sample.selfView);
+            //LOG.debug(sample.selfView.toString());
+            //LOG.debug("{}", sample.getGradientNeighbours());
         }
     };
 

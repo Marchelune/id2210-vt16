@@ -31,6 +31,7 @@ import se.sics.kompics.simulator.SimulationScenario;
 import se.sics.kompics.simulator.adaptor.Operation;
 import se.sics.kompics.simulator.adaptor.Operation1;
 import se.sics.kompics.simulator.adaptor.Operation2;
+import se.sics.kompics.simulator.adaptor.Operation3;
 import se.sics.kompics.simulator.adaptor.distributions.ConstantDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.IntegerUniformDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
@@ -54,6 +55,7 @@ public class ScenarioGen {
 	                @Override
 	                public void setupGlobalView(GlobalView gv) {
 	                		gv.setValue("simulation.newsstore", new GlobalNewsStore());
+	                		gv.setValue("simulation.amountOfTraffic", new AmountOfTrafficStore());
 
 	                }
 	            };
@@ -141,7 +143,7 @@ public class ScenarioGen {
         }
     };
 
-    static Operation2<StartNodeEvent, Integer, Integer> startNodeOp = new Operation2<StartNodeEvent, Integer, Integer>() {
+    static Operation2<StartNodeEvent, Integer, Integer> startNodeWriterOp = new Operation2<StartNodeEvent, Integer, Integer>() {
 
         @Override
         public StartNodeEvent generate(final Integer nodeId, final Integer timer) {
@@ -173,14 +175,55 @@ public class ScenarioGen {
                     nodeConfig.put("system.id", nodeId);
                     nodeConfig.put("system.seed", ScenarioSetup.getNodeSeed(nodeId));
                     nodeConfig.put("system.port", ScenarioSetup.appPort);
-                    int test = 5000000;
-                    nodeConfig.put("newsTimeOut", test);
+                    nodeConfig.put("newsTimeOut", timer);
+                    nodeConfig.put("writer", true);
                     return nodeConfig;
                 }
             };
         }
     };
 
+    static Operation3<StartNodeEvent, Integer, Integer, Long> startNodeOp = new Operation3<StartNodeEvent, Integer, Integer, Long>() {
+
+        @Override
+        public StartNodeEvent generate(final Integer nodeId, final Integer timer, final Long writer) {
+            return new StartNodeEvent() {
+                KAddress selfAdr;
+
+                {
+                    selfAdr = ScenarioSetup.getNodeAdr(nodeId);
+                }
+
+                @Override
+                public Address getNodeAddress() {
+                    return selfAdr;
+                }
+
+                @Override
+                public Class getComponentDefinition() {
+                    return HostMngrComp.class;
+                }
+
+                @Override
+                public HostMngrComp.Init getComponentInit() {
+                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId);
+                }
+
+                @Override
+                public Map<String, Object> initConfigUpdate() {
+                    Map<String, Object> nodeConfig = new HashMap<>();
+                    nodeConfig.put("system.id", nodeId);
+                    nodeConfig.put("system.seed", ScenarioSetup.getNodeSeed(nodeId));
+                    nodeConfig.put("system.port", ScenarioSetup.appPort);
+                    nodeConfig.put("newsTimeOut", timer);
+                    // writer is 1 if the node is a writer, 0 otherwise
+                    nodeConfig.put("writer", writer);
+                    return nodeConfig;
+                }
+            };
+        }
+    };
+    
     public static SimulationScenario simpleBoot() {
     	final Random rnd = new Random();
         SimulationScenario scen = new SimulationScenario() {
@@ -210,20 +253,28 @@ public class ScenarioGen {
                         raise(1, startObserverOp, constant(0));
                     }
                 };
-                StochasticProcess startPeers = new StochasticProcess() {
+                StochasticProcess startNonWriterPeers = new StochasticProcess() {
                     {
                     	
-                        eventInterArrivalTime(uniform(1000, 1100));
-                        raise(20, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(50000,100000,rnd));
+                        eventInterArrivalTime(uniform(1, 50));
+                        raise(188, startNodeOp, new BasicIntSequentialDistribution(63), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
+                    }
+                };
+                StochasticProcess startWriterPeers = new StochasticProcess() {
+                    {
+                    	
+                        eventInterArrivalTime(uniform(1, 50));
+                        raise(62, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
                     }
                 };
                 setup.start();
                 systemSetup.start();
                 
-                startBootstrapServer.startAfterTerminationOf(1000, systemSetup);
-                startPeers.startAfterTerminationOf(1000, startBootstrapServer);
-                startObserver.startAfterTerminationOf(1, startPeers);
-                terminateAfterTerminationOf(10000000, startPeers);
+                startBootstrapServer.startAfterTerminationOf(100, systemSetup);
+                startNonWriterPeers.startAfterTerminationOf(100, startBootstrapServer);
+                startWriterPeers.startAfterTerminationOf(1000, startNonWriterPeers);
+                startObserver.startAfterTerminationOf(1, startWriterPeers);
+                terminateAfterTerminationOf(45000, setup);
             }
         };
 

@@ -1,0 +1,5 @@
+Croupier shuffle period = 2 secs
+
+25% of nodes are writers ?
+Size of network : 10, 25, 50, 100, 500, 1000, 10000
+TTL : 10, 25, 50, 100, 250, 500, 1000

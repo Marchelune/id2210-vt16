@@ -32,6 +32,9 @@ public class News {
 	@Override
 	public boolean equals(Object obj) {
 		if(!(obj instanceof News)) return false;
+		
+		if(this == obj) return true;
+		
 		News news = (News) obj;
 		return news.getTitle().equals(title);
 	}
