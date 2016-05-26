@@ -143,45 +143,6 @@ public class ScenarioGen {
         }
     };
 
-    static Operation2<StartNodeEvent, Integer, Integer> startNodeWriterOp = new Operation2<StartNodeEvent, Integer, Integer>() {
-
-        @Override
-        public StartNodeEvent generate(final Integer nodeId, final Integer timer) {
-            return new StartNodeEvent() {
-                KAddress selfAdr;
-
-                {
-                    selfAdr = ScenarioSetup.getNodeAdr(nodeId);
-                }
-
-                @Override
-                public Address getNodeAddress() {
-                    return selfAdr;
-                }
-
-                @Override
-                public Class getComponentDefinition() {
-                    return HostMngrComp.class;
-                }
-
-                @Override
-                public HostMngrComp.Init getComponentInit() {
-                    return new HostMngrComp.Init(selfAdr, ScenarioSetup.bootstrapServer, ScenarioSetup.newsOverlayId);
-                }
-
-                @Override
-                public Map<String, Object> initConfigUpdate() {
-                    Map<String, Object> nodeConfig = new HashMap<>();
-                    nodeConfig.put("system.id", nodeId);
-                    nodeConfig.put("system.seed", ScenarioSetup.getNodeSeed(nodeId));
-                    nodeConfig.put("system.port", ScenarioSetup.appPort);
-                    nodeConfig.put("newsTimeOut", timer);
-                    nodeConfig.put("writer", true);
-                    return nodeConfig;
-                }
-            };
-        }
-    };
 
     static Operation3<StartNodeEvent, Integer, Integer, Long> startNodeOp = new Operation3<StartNodeEvent, Integer, Integer, Long>() {
 
