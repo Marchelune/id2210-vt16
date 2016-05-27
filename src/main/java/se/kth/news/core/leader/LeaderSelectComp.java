@@ -29,6 +29,8 @@ import se.kth.news.core.epfd.Suspect;
 import se.kth.news.core.epfd.Watch;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.core.news.util.NewsViewComparator;
+import se.kth.news.sim.GlobalNewsStore;
+import se.kth.news.sim.task2.MaxCvTimeStore;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
@@ -37,6 +39,7 @@ import se.sics.kompics.Positive;
 import se.sics.kompics.Start;
 import se.sics.kompics.network.Network;
 import se.sics.kompics.network.Transport;
+import se.sics.kompics.simulator.util.GlobalView;
 import se.sics.kompics.timer.Timer;
 import se.sics.ktoolbox.gradient.GradientPort;
 import se.sics.ktoolbox.gradient.event.TGradientSample;
@@ -80,6 +83,13 @@ public class LeaderSelectComp extends ComponentDefinition {
 	private List<KAddress> quorum;
 	private int receivedVotes;
 	private boolean isCandidate;
+	
+	//Simulation
+	// The maximum of rounds it took since the beginning of the simulation 
+	// for the gradient to go from a non stable state to a stable state
+	private Integer maxNbRoundsToConverge;
+	// The current number of rounds since the last time the gradient was stable
+	private Integer currentNbRoundsToConverge ;
 
 	public LeaderSelectComp(Init init) {
 		selfAdr = init.selfAdr;
@@ -91,8 +101,15 @@ public class LeaderSelectComp extends ComponentDefinition {
 		currentLeader = null;
 
 		stableConsecutiveRounds=0;
+		
+		//Simulation
+		maxNbRoundsToConverge = 0;
+		currentNbRoundsToConverge = 0;
 
-
+		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+		MaxCvTimeStore maxCvTimeStore = gv.getValue("simulation.maxCvTimeStore", MaxCvTimeStore.class);
+		maxCvTimeStore.Store.put(selfAdr, maxNbRoundsToConverge);
+		
 		subscribe(handleStart, control);
 		subscribe(handleGradientSample, gradientPort);
 		subscribe(handleElectionRequest, networkPort);
@@ -161,16 +178,32 @@ public class LeaderSelectComp extends ComponentDefinition {
 				currentFingersSample.add(fg.getSource());
 			}
 
-			if(!(currentLeader==null)) return; //already a leader, no need to check TODO maybe change the order later
-
+			
+			
+			
+			
+			currentNbRoundsToConverge++;
+			
 			if(! gradientIsStable(newNeighboursSample)) return; //gradient not stable to perform election
-
+			
+			// Simulation
+			if (currentNbRoundsToConverge > maxNbRoundsToConverge){
+				maxNbRoundsToConverge = currentNbRoundsToConverge;
+				GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+				MaxCvTimeStore maxCvTimeStore = gv.getValue("simulation.maxCvTimeStore", MaxCvTimeStore.class);
+				maxCvTimeStore.Store.put(selfAdr, maxNbRoundsToConverge);
+			}
+			currentNbRoundsToConverge = 0;
+			
+			if(!(currentLeader==null)) return; //already a leader, no need to check TODO maybe change the order later
+			
 			for (Container<KAddress, NewsView> neighbour : newNeighboursSample){
 				if(viewComparator.compare(neighbour.getContent(), currentLocalView ) > 0 ){
 					leaderPull(neighbour.getSource()); //maybe this good neighbour knows about a leader  
 					return;
 				}
 			}
+			
 			//none of our neighbours is above us
 			startElection();
 
