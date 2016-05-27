@@ -17,6 +17,8 @@
  */
 package se.kth.news.core;
 
+import se.kth.news.core.epfd.Epfd;
+import se.kth.news.core.epfd.EventuallyPerfectFailureDetectorPort;
 import se.kth.news.core.leader.LeaderSelectComp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +60,7 @@ public class AppMngrComp extends ComponentDefinition {
     //***************************INTERNAL_STATE*********************************
     private Component leaderSelectComp;
     private Component newsComp;
+    private Component epfd;
     //******************************AUX_STATE***********************************
     private OMngrTGradient.ConnectRequest pendingGradientConnReq;
     //**************************************************************************
@@ -89,18 +92,30 @@ public class AppMngrComp extends ComponentDefinition {
         @Override
         public void handle(OMngrTGradient.ConnectResponse event) {
             LOG.info("{}overlays connected", logPrefix);
+            connectEPFD();
             connectLeaderSelect();
             connectNews();
+            
             trigger(Start.event, leaderSelectComp.control());
             trigger(Start.event, newsComp.control());
+            trigger(Start.event, epfd.control());
         }
     };
+    
+    private void connectEPFD(){
+    	epfd = create(Epfd.class, new Epfd.Init(selfAdr));
+    	connect(epfd.getNegative(Timer.class),  extPorts.timerPort, Channel.TWO_WAY);
+    	connect(epfd.getNegative(Network.class), extPorts.networkPort, Channel.TWO_WAY);
+    }
 
-    private void connectLeaderSelect() {
+
+	private void connectLeaderSelect() {
         leaderSelectComp = create(LeaderSelectComp.class, new LeaderSelectComp.Init(selfAdr, new NewsViewComparator()));
         connect(leaderSelectComp.getNegative(Timer.class), extPorts.timerPort, Channel.TWO_WAY);
         connect(leaderSelectComp.getNegative(Network.class), extPorts.networkPort, Channel.TWO_WAY);
         connect(leaderSelectComp.getNegative(GradientPort.class), extPorts.gradientPort, Channel.TWO_WAY);
+        connect(leaderSelectComp.getNegative(EventuallyPerfectFailureDetectorPort.class),
+        		epfd.getPositive(EventuallyPerfectFailureDetectorPort.class), Channel.TWO_WAY);
     }
 
     private void connectNews() {

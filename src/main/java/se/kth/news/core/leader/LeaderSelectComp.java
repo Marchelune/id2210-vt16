@@ -24,6 +24,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import se.kth.news.core.epfd.EventuallyPerfectFailureDetectorPort;
+import se.kth.news.core.epfd.Suspect;
+import se.kth.news.core.epfd.Watch;
 import se.kth.news.core.news.util.NewsView;
 import se.kth.news.core.news.util.NewsViewComparator;
 import se.sics.kompics.ClassMatchedHandler;
@@ -56,6 +59,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 	Positive<Timer> timerPort = requires(Timer.class);
 	Positive<Network> networkPort = requires(Network.class);
 	Positive<GradientPort> gradientPort = requires(GradientPort.class);
+	Positive<EventuallyPerfectFailureDetectorPort> failureDetector = requires(EventuallyPerfectFailureDetectorPort.class);
 	Negative<LeaderSelectPort> leaderUpdate = provides(LeaderSelectPort.class);
 	//*******************************EXTERNAL_STATE*****************************
 	private KAddress selfAdr;
@@ -95,6 +99,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 		subscribe(handleVote, networkPort);
 		subscribe(handleLeaderUpdate, networkPort);
 		subscribe(handleLeaderPullRequest, networkPort);
+		subscribe(handleSuspectLeader, failureDetector);
 	}
 
 	/**
@@ -221,7 +226,18 @@ public class LeaderSelectComp extends ComponentDefinition {
 				isCandidate =false;
 				trigger(new LeaderUpdate(selfAdr),leaderUpdate);
 			}
-
+		}
+	};
+	
+	/**
+	 * The leader is probably dead.
+	 */
+	private Handler<Suspect> handleSuspectLeader = new Handler<Suspect>() {
+		@Override
+		public void handle(Suspect event) {
+			if(!event.suspected.equals(currentLeader)) return;
+			currentLeader=null;
+			
 		}
 	};
 
@@ -234,6 +250,12 @@ public class LeaderSelectComp extends ComponentDefinition {
 			if(currentLeader!=null && content.leaderAdr.equals(currentLeader)) return;
 			LOG.info("{} knows a new leader, the node {}", logPrefix, content.leaderAdr.getId());
 			currentLeader= content.leaderAdr;
+			
+			if(context.getHeader().getSource().equals(currentLeader)){ 
+				//the leader himself sent the update : we are a close neighbour and should watch him
+				trigger(new Watch(currentLeader),failureDetector);
+			}
+			
 			broadcastToNodes(content, currentNeighboursSample);
 			trigger(content,leaderUpdate);
 		}
