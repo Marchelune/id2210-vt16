@@ -156,11 +156,11 @@ public class NewsComp extends ComponentDefinition {
 			
 			updateLocalNewsView();
 
-			GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
-			GlobalNewsStore newsStore = gv.getValue("simulation.newsstore", GlobalNewsStore.class);
+			//GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+			//GlobalNewsStore newsStore = gv.getValue("simulation.newsstore", GlobalNewsStore.class);
 
 			//Simulation
-			newsStore.Store.put(selfAdr, newsChain);
+			//newsStore.Store.put(selfAdr, newsChain);
 		}
 	};
 
