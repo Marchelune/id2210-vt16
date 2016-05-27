@@ -179,7 +179,7 @@ private static final Logger LOG = LoggerFactory.getLogger(SimulationObserverTask
 			KAddress addr = addrIt.next();
 			Integer nodeTraffic = trafficStore.Store.get(addr);
 			globalTraffic += nodeTraffic;
-			//LOG.info(" Global Traffic: {} blabla.", nodeTraffic);
+			//LOG.info(" Global Traffic: {} .", nodeTraffic);
 		}
 		double globalTrafficDouble = (double) globalTraffic;
 		LOG.info(" Global Traffic: Globally, nodes sent {} messages.", globalTrafficDouble);
