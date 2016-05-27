@@ -94,6 +94,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 		subscribe(handleElectionRequest, networkPort);
 		subscribe(handleVote, networkPort);
 		subscribe(handleLeaderUpdate, networkPort);
+		subscribe(handleLeaderPullRequest, networkPort);
 	}
 
 	/**
@@ -146,9 +147,6 @@ public class LeaderSelectComp extends ComponentDefinition {
 	Handler handleGradientSample = new Handler<TGradientSample<NewsView>>() {
 		@Override
 		public void handle(TGradientSample<NewsView> sample) {
-			//            LOG.debug("{}neighbours:{}", logPrefix, sample.gradientNeighbours);
-			//            LOG.debug("{}fingers:{}", logPrefix, sample.gradientFingers);
-			//            LOG.debug("{}local view:{}", logPrefix, sample.selfView);
 			List<Container<KAddress, NewsView>> newNeighboursSample = sample.getGradientNeighbours();
 			currentLocalView = sample.selfView;
 
@@ -164,6 +162,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 
 			for (Container<KAddress, NewsView> neighbour : newNeighboursSample){
 				if(viewComparator.compare(neighbour.getContent(), currentLocalView ) > 0 ){
+					leaderPull(neighbour.getSource()); //maybe this good neighbour knows about a leader  
 					return;
 				}
 			}
@@ -172,6 +171,17 @@ public class LeaderSelectComp extends ComponentDefinition {
 
 		}
 	};
+	
+	/**
+	 * asks a neighbor to get the leader
+	 */
+	private void leaderPull(KAddress nb){
+		LOG.debug("{} pulls leader from fingers", logPrefix);
+		if(currentFingersSample.isEmpty())return;
+		KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr,currentFingersSample.get(0), Transport.UDP);
+		KContentMsg msg = new BasicContentMsg(header, new LeaderPullRequest());
+		trigger(msg, networkPort);
+	}
 
 	/**
 	 * triggered when the node believes he's the leader.
@@ -185,17 +195,20 @@ public class LeaderSelectComp extends ComponentDefinition {
 		broadcastToNodes(new Election(selfAdr,currentLocalView), quorum);
 	}
 
+	
 	ClassMatchedHandler<Election, KContentMsg<?, ?, Election>> handleElectionRequest = new ClassMatchedHandler<Election, KContentMsg<?, ?, Election>>() {
 		@Override
 		public void handle(Election content, KContentMsg<?, ?, Election> context) {
 			if(currentLeader!=null) return;			
-
 			KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, context.getHeader().getSource(), Transport.UDP);
 			KContentMsg msg = new BasicContentMsg(header, new Vote(content));
 			trigger(msg, networkPort);
 		}
 	};
 
+	/**
+	 * The leader considers itself elected when half of the quorum replies.
+	 */
 	ClassMatchedHandler<Vote, KContentMsg<?, ?, Vote>> handleVote = new ClassMatchedHandler<Vote, KContentMsg<?,?,Vote>>() {
 		@Override
 		public void handle(Vote content, KContentMsg<?, ?, Vote> context) {
@@ -212,25 +225,31 @@ public class LeaderSelectComp extends ComponentDefinition {
 		}
 	};
 
+	/**
+	 * Push strategy when receiving a new leader
+	 */
 	ClassMatchedHandler<LeaderUpdate, KContentMsg<?, ?, LeaderUpdate>> handleLeaderUpdate = new ClassMatchedHandler<LeaderUpdate, KContentMsg<?,?,LeaderUpdate>>() {
 		@Override
 		public void handle(LeaderUpdate content, KContentMsg<?, ?, LeaderUpdate> context) {
 			if(currentLeader!=null && content.leaderAdr.equals(currentLeader)) return;
+			LOG.info("{} knows a new leader, the node {}", logPrefix, content.leaderAdr.getId());
 			currentLeader= content.leaderAdr;
 			broadcastToNodes(content, currentNeighboursSample);
-			broadcastToNodes(content, currentFingersSample);
 			trigger(content,leaderUpdate);
-
-			String nbs="";
-			for(KAddress nb : currentNeighboursSample){
-				nbs += " " + nb.getId() + " ";
-			}
-			String fgs="";
-			for(KAddress fg : currentFingersSample){
-				fgs += " " + fg.getId() + " ";
-			}
-
-			LOG.debug("{} knows a brand new leader : {}. Lets tell \n my neighbours : {} \n my fingers : {}", logPrefix,currentLeader,nbs,fgs);
+		}
+	};
+	
+	/**
+	 * Pull strategy : some node wants to know if we know the leader
+	 */
+	ClassMatchedHandler<LeaderPullRequest, KContentMsg<?, ?, LeaderPullRequest>> handleLeaderPullRequest = new ClassMatchedHandler<LeaderPullRequest, KContentMsg<?,?,LeaderPullRequest>>() {
+		@Override
+		public void handle(LeaderPullRequest content, KContentMsg<?, ?, LeaderPullRequest> context) {
+			if(currentLeader==null) return;
+			LOG.debug("{} answers a leader pull request from node {}", logPrefix, context.getHeader().getSource().getId());
+			KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, context.getHeader().getSource(), Transport.UDP);
+			KContentMsg msg = new BasicContentMsg(header, new LeaderUpdate(currentLeader));
+			trigger(msg, networkPort);
 		}
 	};
 
