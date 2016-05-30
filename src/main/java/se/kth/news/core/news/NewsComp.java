@@ -34,6 +34,7 @@ import se.kth.news.core.news.util.PullRequest;
 import se.kth.news.play.Ping;
 import se.kth.news.play.Pong;
 import se.kth.news.sim.GlobalNewsStore;
+import se.kth.news.sim.task2.MaxCvTimeStore;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
@@ -83,6 +84,10 @@ public class NewsComp extends ComponentDefinition {
 	private ArrayList<KAddress> currentFingers = new ArrayList<>();
 	private LinkedHashSet<News> newsChain;
 	private KAddress leader;
+	
+	// Simulation
+	// Equals to 1 if the node is a writer (obtained from the config file)
+	private Long writer;
 
 	/**
 	 * this timestamp has two uses
@@ -126,6 +131,9 @@ public class NewsComp extends ComponentDefinition {
 		gradientOId = init.gradientOId;
 		newsChain = new LinkedHashSet<>();
 		leader=null;
+		
+
+		writer = config().getValue("writer", Long.class);
 
 		subscribe(handleStart, control);
 		subscribe(handleCroupierSample, croupierPort);
@@ -142,11 +150,15 @@ public class NewsComp extends ComponentDefinition {
 		public void handle(Start event) {
 			LOG.info("{}starting...", logPrefix);
 			
-			//-- News creation timer
-			SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(5000, newsTimeOut);
-			Timeout timeout = new NewsTimeOut(spt);
-			spt.setTimeoutEvent(timeout);
-			trigger(spt, timerPort);
+			SchedulePeriodicTimeout spt;
+			Timeout timeout;
+			if(writer == 1){
+				//-- News creation timer
+				spt = new SchedulePeriodicTimeout(5000, newsTimeOut);
+				timeout = new NewsTimeOut(spt);
+				spt.setTimeoutEvent(timeout);
+				trigger(spt, timerPort);
+			}
 			
 			//-- News pull dissemination timer
 			spt = new SchedulePeriodicTimeout(10000, PULL_PERIOD);
