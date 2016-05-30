@@ -55,7 +55,11 @@ public class ScenarioGen {
 	            return new SetupEvent() {
 	                @Override
 	                public void setupGlobalView(GlobalView gv) {
+	                		// Store to save the maximum gradient convergence time for each node
 	                		gv.setValue("simulation.maxCvTimeStore", new MaxCvTimeStore());
+	                		// Store to save the number of pull rounds needed for a node to get the leader info
+	                		gv.setValue("simulation.gotLeaderStore", new MaxCvTimeStore());
+	                		
 
 	                }
 	            };
