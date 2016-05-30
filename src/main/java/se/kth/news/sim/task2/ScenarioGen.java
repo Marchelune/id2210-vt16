@@ -218,14 +218,14 @@ public class ScenarioGen {
                  {
                  	
                      eventInterArrivalTime(uniform(1, 50));
-                     raise(20, startNodeOp, new BasicIntSequentialDistribution(63), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
+                     raise(20, startNodeOp, new BasicIntSequentialDistribution(10), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
                  }
              };
              StochasticProcess startWriterPeers = new StochasticProcess() {
                  {
                  	
                      eventInterArrivalTime(uniform(1, 50));
-                     raise(5, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
+                     raise(5, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(3000,7000,rnd), constant(1));
                  }
              };
              setup.start();
@@ -235,7 +235,7 @@ public class ScenarioGen {
              startNonWriterPeers.startAfterTerminationOf(100, startBootstrapServer);
              startWriterPeers.startAfterTerminationOf(1000, startNonWriterPeers);
              startObserver.startAfterTerminationOf(1, startWriterPeers);
-             terminateAfterTerminationOf(45000, setup);
+             terminateAfterTerminationOf(60000, setup);
          }
      };
 

@@ -65,6 +65,11 @@ public class NewsComp extends ComponentDefinition {
 
 	private static final Logger LOG = LoggerFactory.getLogger(NewsComp.class);
 	private static final int PULL_PERIOD = 5000;
+	/**
+	 * SAFE_PUSH_NODES : Nmb of nodes the leader pushes it news directly to prevent loosing some
+	 * in case of failure.
+	 */
+	private static final int SAFE_PUSH_NODES = 3;
 	private String logPrefix = " ";
 
 	//*******************************CONNECTIONS********************************
@@ -85,12 +90,12 @@ public class NewsComp extends ComponentDefinition {
 	private KAddress leader;
 
 	/**
-	 * this timestamp has two uses
+	 * currentNewsTimestamp : this timestamp has two uses
 	 * - if the node is the leader, it increments the timestamp to order the news he publishes
 	 * - if the node is a simple peer, this is the timestamp of the next news the node is expecting to receive
 	 */
 	private int currentNewsTimestamp =0;
-
+	
 	private ArrayList<News> createdNewsBuffer; //storing news if we don't have a leader
 	private ArrayList<News> bufferedNews; //news received but we have to fetch other before we put them in the blockchain
 
@@ -173,10 +178,7 @@ public class NewsComp extends ComponentDefinition {
 			News newNews = new News("News " + simulatedNewsCount + " from " + selfAdr, BASE_TTL, -1);
 			simulatedNewsCount++;
 			LOG.debug("{} created new news:{}", logPrefix, newNews.toString());			
-			//broadcastToNeighbours(newNews); (TASK1)
-			//newsChain.add(newNews);
-			//updateLocalNewsView();
-			//simulatedNewsCount++;
+	
 			createdNewsBuffer.add(newNews);
 			if(leader==null) {
 				LOG.debug("{} has no leader yet", logPrefix);
@@ -277,6 +279,7 @@ public class NewsComp extends ComponentDefinition {
 			if (sample.gradientNeighbours.isEmpty()) return;
 
 			currentNeighbours = sample.gradientNeighbours;
+			
 			currentFingers = new ArrayList<>();
 			for(Container<KAddress, ?> nb : sample.gradientFingers){
 				currentFingers.add(nb.getSource());
@@ -298,19 +301,34 @@ public class NewsComp extends ComponentDefinition {
 			//--Leader
 			if(isLeader()){
 				News newNews = new News(content.getTitle(),content.getTtl(),currentNewsTimestamp);
+				
+				//Task 4.1 pushing to the best node(s) after us in case we die
+				// we MUST send to the best nodes first !!! 
+				for(int k=0;k<SAFE_PUSH_NODES;k++){
+					KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, 
+							currentNeighbours.get(currentNeighbours.size()-1-k).getSource(), Transport.UDP);
+					KContentMsg msg = new BasicContentMsg(header, newNews);
+					trigger(msg, networkPort);
+				}
+				
+				//comiting after to ensure uniformity ... I guess
 				currentNewsTimestamp++;
 				newsChain.add(newNews);
 				updateLocalNewsView();
 				return;
 			}
+			
+			
 			//--Peer
 			if(bufferedNews.contains(content)) return;				
 			bufferedNews.add(content);
 
 			for(News n : bufferedNews){
 				if(currentNewsTimestamp  == n.getTimestamp()){
-					newsChain.add(n);
-					updateLocalNewsView();
+					if(!newsChain.contains(n)){
+						newsChain.add(n);
+						updateLocalNewsView();
+					}
 					currentNewsTimestamp++;
 				}
 			}
