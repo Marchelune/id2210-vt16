@@ -61,7 +61,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 
 	private static final Logger LOG = LoggerFactory.getLogger(LeaderSelectComp.class);
 	private String logPrefix = " ";
-	private static final int LEADER_PULL_PERIOD = 9000;
+	private static final int LEADER_PULL_PERIOD = 4000;
 
 	//*******************************CONNECTIONS********************************
 	Positive<Timer> timerPort = requires(Timer.class);
