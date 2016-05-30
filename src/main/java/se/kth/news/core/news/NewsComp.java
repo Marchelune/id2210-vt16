@@ -87,7 +87,7 @@ public class NewsComp extends ComponentDefinition {
 	/**
 	 * this timestamp has two uses
 	 * - if the node is the leader, it increments the timestamp to order the news he publishes
-	 * - if the node is a simple peer, this is the timestamp of the next news the node is expecting
+	 * - if the node is a simple peer, this is the timestamp of the next news the node is expecting to receive
 	 */
 	private int currentNewsTimestamp =0;
 
@@ -288,7 +288,6 @@ public class NewsComp extends ComponentDefinition {
 		@Override
 		public void handle(LeaderUpdate event) {
 			leader = event.leaderAdr;
-			currentNewsTimestamp=0; //TODO maybe smthg to do if crashing @task4
 		}
 	};
 

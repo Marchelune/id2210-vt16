@@ -102,7 +102,7 @@ public class Epfd extends ComponentDefinition {
 			CheckTimeout timeout = new CheckTimeout(st);
 			st.setTimeoutEvent(timeout);
 			trigger(st, timerPort);
-			timerId = timeout.getTimeoutId();			
+			timerId = timeout.getTimeoutId();		
 		}
 	};
 	
