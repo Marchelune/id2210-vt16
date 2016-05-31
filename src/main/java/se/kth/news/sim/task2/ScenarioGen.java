@@ -227,6 +227,7 @@ public class ScenarioGen {
                  {
                  	
                      eventInterArrivalTime(uniform(1, 50));
+
                      raise(38, startNodeOp, new BasicIntSequentialDistribution(13), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
                  }
              };
@@ -234,6 +235,7 @@ public class ScenarioGen {
                  {
                  	
                      eventInterArrivalTime(uniform(1, 50));
+
                      raise(12, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
                  }
              };
@@ -245,6 +247,7 @@ public class ScenarioGen {
              startWriterPeers.startAfterTerminationOf(1000, startNonWriterPeers);
              startObserver.startAfterTerminationOf(1, startWriterPeers);
              terminateAfterTerminationOf(100000, setup);
+
          }
      };
 
