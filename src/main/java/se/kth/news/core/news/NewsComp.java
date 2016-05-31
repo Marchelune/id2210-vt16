@@ -206,6 +206,7 @@ public class NewsComp extends ComponentDefinition {
 				KContentMsg msg = new BasicContentMsg(header, n);
 				trigger(msg, networkPort);
 			}
+			createdNewsBuffer.clear();
 		};
 	};
 	
