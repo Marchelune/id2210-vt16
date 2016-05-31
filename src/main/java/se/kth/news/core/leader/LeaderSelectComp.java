@@ -61,7 +61,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 
 	private static final Logger LOG = LoggerFactory.getLogger(LeaderSelectComp.class);
 	private String logPrefix = " ";
-	private static final int LEADER_PULL_PERIOD = 4000;
+	private static final int LEADER_PULL_PERIOD = 1000;
 
 	//*******************************CONNECTIONS********************************
 	Positive<Timer> timerPort = requires(Timer.class);
@@ -97,6 +97,11 @@ public class LeaderSelectComp extends ComponentDefinition {
 	// The current number of rounds since the last time the gradient was stable
 	private Integer currentNbRoundsToConverge ;
 
+	// Case without churn: number of pull rounds until the node gets the leader info (Task 3.1)
+	// Case without churn: nodes choose only one leader and don't change anymore
+	private Integer numberOfPulls;
+	private Integer numberOfPullsUntilGetLeader;
+
 	public LeaderSelectComp(Init init) {
 		selfAdr = init.selfAdr;
 		logPrefix = "<nid:" + selfAdr.getId() + ">";
@@ -112,11 +117,21 @@ public class LeaderSelectComp extends ComponentDefinition {
 		//Simulation
 		maxNbRoundsToConverge = 0;
 		currentNbRoundsToConverge = 0;
+		//Task 3.1
+		numberOfPulls = 0;
+		numberOfPullsUntilGetLeader = 0;
 
 		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
 		MaxCvTimeStore maxCvTimeStore = gv.getValue("simulation.maxCvTimeStore", MaxCvTimeStore.class);
+		MaxCvTimeStore gotLeaderStore = gv.getValue("simulation.gotLeaderStore", MaxCvTimeStore.class);
+		MaxCvTimeStore nbRoundsWhenLeaderElectStore = gv.getValue("simulation.nbRoundsWhenLeaderElectStore", MaxCvTimeStore.class);
+		MaxCvTimeStore nbPullRoundsStore = gv.getValue("simulation.nbPullRoundsStore", MaxCvTimeStore.class);
 		try{
 			maxCvTimeStore.Store.put(selfAdr, maxNbRoundsToConverge);
+			// We put -1 in the store to indicate we do not have a leader yet (Task 3.1)
+			gotLeaderStore.Store.put(selfAdr, -1);
+			nbRoundsWhenLeaderElectStore.Store.put(selfAdr, 0);
+			nbPullRoundsStore.Store.put(selfAdr, 0);
 		}catch(Exception e){
 			e.printStackTrace();
 		}
@@ -178,7 +193,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 		public void handle(Start event) {
 			LOG.info("{}starting...", logPrefix);
 			//-- News pull leader timer
-			SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(2000, LEADER_PULL_PERIOD);
+			SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(3000, LEADER_PULL_PERIOD);
 			Timeout timeout = new LeaderPullTimeOut(spt);
 			spt.setTimeoutEvent(timeout);
 			trigger(spt, timerPort);
@@ -194,9 +209,16 @@ public class LeaderSelectComp extends ComponentDefinition {
 		public void handle(LeaderPullTimeOut event) {
 			if(currentFingersSample==null || currentFingersSample.isEmpty())return;
 			LOG.debug("{} pulls leader from fingers", logPrefix);
+			//LOG.debug(" {} current leader {}",logPrefix, currentLeader); // simu
 			KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr,currentFingersSample.get(0), Transport.UDP);
 			KContentMsg msg = new BasicContentMsg(header, new LeaderPullRequest());
 			trigger(msg, networkPort);
+			// Simulation (Task 3.1)
+			numberOfPulls++;
+			// We store the number of pulls
+			GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+			MaxCvTimeStore nbPullRoundsStore = gv.getValue("simulation.nbPullRoundsStore", MaxCvTimeStore.class);
+			nbPullRoundsStore.Store.put(selfAdr, numberOfPulls);
 		}
 	};
 
@@ -277,6 +299,12 @@ public class LeaderSelectComp extends ComponentDefinition {
 				LOG.debug("{} is the new leader !", logPrefix);
 				isCandidate =false;
 				trigger(new LeaderUpdate(selfAdr),leaderUpdate);
+				
+				// Simulation (Task 3.1 : getLeader)
+				numberOfPullsUntilGetLeader = numberOfPulls;
+				GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+				MaxCvTimeStore gotLeaderStore = gv.getValue("simulation.gotLeaderStore", MaxCvTimeStore.class);
+				gotLeaderStore.Store.put(selfAdr, numberOfPullsUntilGetLeader);
 			}
 		}
 	};
@@ -315,6 +343,12 @@ public class LeaderSelectComp extends ComponentDefinition {
 			LOG.info("{} knows a new leader, the node {}", logPrefix, content.leaderAdr.getId());
 			currentLeader= content.leaderAdr;
 			
+			// Simulation (Task 3.1 : getLeader)
+			numberOfPullsUntilGetLeader = numberOfPulls;
+			GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+			MaxCvTimeStore gotLeaderStore = gv.getValue("simulation.gotLeaderStore", MaxCvTimeStore.class);
+			gotLeaderStore.Store.put(selfAdr, numberOfPullsUntilGetLeader);
+			
 			if(context.getHeader().getSource().equals(currentLeader)){ 
 				//the leader himself sent the update : we are a close neighbour and should watch him
 				trigger(new Watch(currentLeader),failureDetector);
@@ -323,8 +357,9 @@ public class LeaderSelectComp extends ComponentDefinition {
 			}
 			
 			voteToken=true; //we can vote again
-			
-			broadcastToNodes(content, currentNeighboursSample);
+			if(currentNeighboursSample != null){
+				broadcastToNodes(content, currentNeighboursSample); //UNCOMMENT
+			}
 			trigger(content,leaderUpdate);
 		}
 	};
@@ -336,6 +371,7 @@ public class LeaderSelectComp extends ComponentDefinition {
 		@Override
 		public void handle(LeaderPullRequest content, KContentMsg<?, ?, LeaderPullRequest> context) {
 			if(currentLeader==null) return;
+			//LOG.debug("{} current leader {}", logPrefix, currentLeader); //simu
 			LOG.debug("{} answers a leader pull request from node {}", logPrefix, context.getHeader().getSource().getId());
 			KHeader<KAddress> header = new BasicHeader<KAddress>(selfAdr, context.getHeader().getSource(), Transport.UDP);
 			KContentMsg msg = new BasicContentMsg(header, new LeaderUpdate(currentLeader));

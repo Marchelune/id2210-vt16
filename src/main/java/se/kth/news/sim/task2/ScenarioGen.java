@@ -57,8 +57,13 @@ public class ScenarioGen {
 	                public void setupGlobalView(GlobalView gv) {
 	                		// Store to save the maximum gradient convergence time for each node
 	                		gv.setValue("simulation.maxCvTimeStore", new MaxCvTimeStore());
+	                		// Task 3.1
 	                		// Store to save the number of pull rounds needed for a node to get the leader info
 	                		gv.setValue("simulation.gotLeaderStore", new MaxCvTimeStore());
+	                		// Store to save the number of pull rounds of a node when the leader is elected
+	                		gv.setValue("simulation.nbRoundsWhenLeaderElectStore", new MaxCvTimeStore());
+	                		// Store to save the current number of pull round of the nodes
+	                		gv.setValue("simulation.nbPullRoundsStore", new MaxCvTimeStore());
 	                		
 
 	                }
@@ -79,7 +84,7 @@ public class ScenarioGen {
 	                @Override
 	                public Map<String, Object> initConfigUpdate() {
 	                    HashMap<String, Object> config = new HashMap<String, Object>();
-	                    config.put("simulation.checktimeout", 1000);
+	                    config.put("simulation.checktimeout", 1);
 	                    return config;
 	                }
 	                
@@ -222,14 +227,14 @@ public class ScenarioGen {
                  {
                  	
                      eventInterArrivalTime(uniform(1, 50));
-                     raise(20, startNodeOp, new BasicIntSequentialDistribution(63), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
+                     raise(38, startNodeOp, new BasicIntSequentialDistribution(13), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
                  }
              };
              StochasticProcess startWriterPeers = new StochasticProcess() {
                  {
                  	
                      eventInterArrivalTime(uniform(1, 50));
-                     raise(5, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
+                     raise(12, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
                  }
              };
              setup.start();
@@ -239,7 +244,7 @@ public class ScenarioGen {
              startNonWriterPeers.startAfterTerminationOf(100, startBootstrapServer);
              startWriterPeers.startAfterTerminationOf(1000, startNonWriterPeers);
              startObserver.startAfterTerminationOf(1, startWriterPeers);
-             terminateAfterTerminationOf(45000, setup);
+             terminateAfterTerminationOf(100000, setup);
          }
      };
 
