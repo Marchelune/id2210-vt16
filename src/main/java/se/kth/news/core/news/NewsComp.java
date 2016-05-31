@@ -79,7 +79,7 @@ public class NewsComp extends ComponentDefinition {
     
     //****SIMULATION
     private int simulatedNewsCount;
-    private final static int BASE_TTL = 200;
+    private final static int BASE_TTL = 128;
     private int newsTimeOut;
     private long writer;
     private Integer msgssent;
