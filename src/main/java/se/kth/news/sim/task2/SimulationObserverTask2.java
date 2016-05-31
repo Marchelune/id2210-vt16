@@ -29,7 +29,6 @@ private static final Logger LOG = LoggerFactory.getLogger(SimulationObserverTask
     Positive<Timer> timer = requires(Timer.class);
     Positive<Network> network = requires(Network.class);
     private UUID timerId;
-    private boolean leaderElected = false;
 
     public SimulationObserverTask2() {
 
@@ -55,11 +54,8 @@ private static final Logger LOG = LoggerFactory.getLogger(SimulationObserverTask
         public void handle(CheckTimeout event) {
         	GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
         	MaxCvTimeStore maxCvTimeStore = gv.getValue("simulation.maxCvTimeStore", MaxCvTimeStore.class);
-        	MaxCvTimeStore gotLeaderStore = gv.getValue("simulation.gotLeaderStore", MaxCvTimeStore.class);
-        	MaxCvTimeStore nbPullRoundsStore = gv.getValue("simulation.nbPullRoundsStore", MaxCvTimeStore.class);
-        	MaxCvTimeStore nbRoundsWhenLeaderElectStore = gv.getValue("simulation.nbRoundsWhenLeaderElectStore", MaxCvTimeStore.class);
-        	//convergenceTime(maxCvTimeStore);
-        	leaderInfoDissemination(gotLeaderStore, nbPullRoundsStore, nbRoundsWhenLeaderElectStore);
+        	convergenceTime(maxCvTimeStore);
+
         }
     };
     
@@ -109,51 +105,4 @@ private static final Logger LOG = LoggerFactory.getLogger(SimulationObserverTask
 		LOG.info(" Convergence Time: On average, the gradient for the nodes converged in maximum {} rounds \n", avg);
     }
     
-    // Displays the average and maximum dissemination time of the leader information (in number of pull rounds)
-    public void leaderInfoDissemination(MaxCvTimeStore gotLeaderStore, MaxCvTimeStore nbPullRoundsStore, MaxCvTimeStore nbRoundsWhenLeaderElectStore){
-    	
-    	boolean allNodesHaveLeader = true;
-    	double avg = 0;
-    	double max = 0;
-    	double nbNodesWithLeader = 0;
-    	Set<KAddress> nodeAddrs = gotLeaderStore.Store.keySet();
-    	double totalNbNodes = (double) nodeAddrs.size();
-    	// Iterate on each node
-    	Iterator<KAddress> addrIt = nodeAddrs.iterator();
-    	while(addrIt.hasNext()){
-    		KAddress addr = addrIt.next();
-    		Integer numberOfPullsUntilGetLeader = gotLeaderStore.Store.get(addr);
-    		
-    		if (numberOfPullsUntilGetLeader < 0){ // if the node does not have a leader yet
-    			allNodesHaveLeader = false;
-    		} else {
-    			double nbRoundsWhenLeaderElected = (double) nbRoundsWhenLeaderElectStore.Store.get(addr);
-    			double disseminationTime = (double) numberOfPullsUntilGetLeader - nbRoundsWhenLeaderElected;
-    			//LOG.info(" Leader Dissemination: Node {}, dissemination time : {}", addr, disseminationTime);
-    			avg = avg + disseminationTime;
-    			if(max < disseminationTime){
-    				max = disseminationTime;
-    			}
-    			nbNodesWithLeader++;
-    		}
-    		
-    	}
-    	
-    	
-    	if(nbNodesWithLeader > 0 && !leaderElected){ // When the leader gets elected, the information instantly gets propagated to its 10 gradient neighbours
-    		LOG.info(" Leader Dissemination: LEADER ELECTED");
-    		// We save the number of pull rounds for each node at this moment (when the leader just got elected)
-    		nbRoundsWhenLeaderElectStore.Store.putAll(nbPullRoundsStore.Store);
-    		leaderElected = true;
-    	}
-    	if(allNodesHaveLeader){
-    		avg = avg/totalNbNodes;
-    		LOG.info(" Leader Dissemination: All nodes have received the leader information.");
-    		LOG.info(" Leader Dissemination: Total number of nodes : {}", totalNbNodes);
-    		LOG.info(" Leader Dissemination:  Average dissemination time: {} pull rounds.", avg);
-    		LOG.info(" Leader Dissemination:  Maximum dissemination time: {} pull rounds.", max);
-    	} else {
-    		LOG.info(" Leader Dissemination: At least one node does not have a leader yet. \n");
-    	}
-    }
 }

@@ -65,7 +65,7 @@ import se.sics.ktoolbox.util.overlays.view.OverlayViewUpdatePort;
 public class NewsComp extends ComponentDefinition {
 
 	private static final Logger LOG = LoggerFactory.getLogger(NewsComp.class);
-	private static final int PULL_PERIOD = 5000;
+	private static final int PULL_PERIOD = 1000;
 	/**
 	 * SAFE_PUSH_NODES : Nmb of nodes the leader pushes it news directly to prevent loosing some
 	 * in case of failure.
@@ -137,6 +137,11 @@ public class NewsComp extends ComponentDefinition {
 		newsChain = new LinkedHashSet<>();
 		leader=null;
 		
+		// Task 3.2 - News Dissemination - the store contains how many news items a node has in its news chain
+		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+		MaxCvTimeStore nbNewsStore = gv.getValue("simulation.nbNewsStore", MaxCvTimeStore.class);
+		nbNewsStore.Store.put(selfAdr, currentNewsTimestamp);
+		
 
 		writer = config().getValue("writer", Long.class);
 
@@ -159,7 +164,7 @@ public class NewsComp extends ComponentDefinition {
 			Timeout timeout;
 			if(writer == 1){
 				//-- News creation timer
-				spt = new SchedulePeriodicTimeout(5000, newsTimeOut);
+				spt = new SchedulePeriodicTimeout(15000, newsTimeOut);
 				timeout = new NewsTimeOut(spt);
 				spt.setTimeoutEvent(timeout);
 				trigger(spt, timerPort);
@@ -327,6 +332,11 @@ public class NewsComp extends ComponentDefinition {
 				currentNewsTimestamp++;
 				newsChain.add(newNews);
 				updateLocalNewsView();
+				
+				// Task 3.2 - News Dissemination
+				GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+				MaxCvTimeStore nbNewsStore = gv.getValue("simulation.nbNewsStore", MaxCvTimeStore.class);
+				nbNewsStore.Store.put(selfAdr, currentNewsTimestamp);
 				return;
 			}
 			
@@ -342,6 +352,11 @@ public class NewsComp extends ComponentDefinition {
 						updateLocalNewsView();
 					}
 					currentNewsTimestamp++;
+					
+					// Task 3.2 - News Dissemination
+					GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+					MaxCvTimeStore nbNewsStore = gv.getValue("simulation.nbNewsStore", MaxCvTimeStore.class);
+					nbNewsStore.Store.put(selfAdr, currentNewsTimestamp);
 				}
 			}
 		}

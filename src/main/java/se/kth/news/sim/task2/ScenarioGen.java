@@ -26,6 +26,8 @@ import java.util.Random;
 
 import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
+import se.kth.news.sim.task3.SimulationObserverTask3_1;
+import se.kth.news.sim.task3.SimulationObserverTask3_2;
 import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
@@ -64,14 +66,51 @@ public class ScenarioGen {
 	                		gv.setValue("simulation.nbRoundsWhenLeaderElectStore", new MaxCvTimeStore());
 	                		// Store to save the current number of pull round of the nodes
 	                		gv.setValue("simulation.nbPullRoundsStore", new MaxCvTimeStore());
+	                		// Task 3.2
+	                		// Store to save how many news items a node has in its news chain
+	                		gv.setValue("simulation.nbNewsStore", new MaxCvTimeStore());
 	                		
-
 	                }
 	            };
 	        }
 	    };
 	    
-	    static Operation1 startObserverOp = new Operation1<StartNodeEvent, Long>() {
+	    static Operation1 startObserverTask2Op = new Operation1<StartNodeEvent, Long>() {
+	        public StartNodeEvent generate(final Long nodeId) {
+	            return new StartNodeEvent() {
+	            	KAddress selfAdr;
+	            	int nodeIdInt = toIntExact(nodeId);
+
+	                {
+	                	selfAdr = ScenarioSetup.getNodeAdr(nodeIdInt);
+	                }
+
+	                @Override
+	                public Map<String, Object> initConfigUpdate() {
+	                    HashMap<String, Object> config = new HashMap<String, Object>();
+	                    config.put("simulation.checktimeout", 1000);
+	                    return config;
+	                }
+	                
+	                @Override
+	                public Address getNodeAddress() {
+	                    return selfAdr;
+	                }
+
+	                @Override
+	                public Class getComponentDefinition() {
+	                    return SimulationObserverTask2.class;
+	                }
+
+	                @Override
+	                public Init getComponentInit() {
+	                    return Init.NONE;
+	                }
+	            };
+	        }
+	    };
+	    
+	    static Operation1 startObserverTask3_1Op = new Operation1<StartNodeEvent, Long>() {
 	        public StartNodeEvent generate(final Long nodeId) {
 	            return new StartNodeEvent() {
 	            	KAddress selfAdr;
@@ -95,7 +134,42 @@ public class ScenarioGen {
 
 	                @Override
 	                public Class getComponentDefinition() {
-	                    return SimulationObserverTask2.class;
+	                    return SimulationObserverTask3_1.class;
+	                }
+
+	                @Override
+	                public Init getComponentInit() {
+	                    return Init.NONE;
+	                }
+	            };
+	        }
+	    };
+	    
+	    static Operation1 startObserverTask3_2Op = new Operation1<StartNodeEvent, Long>() {
+	        public StartNodeEvent generate(final Long nodeId) {
+	            return new StartNodeEvent() {
+	            	KAddress selfAdr;
+	            	int nodeIdInt = toIntExact(nodeId);
+
+	                {
+	                	selfAdr = ScenarioSetup.getNodeAdr(nodeIdInt);
+	                }
+
+	                @Override
+	                public Map<String, Object> initConfigUpdate() {
+	                    HashMap<String, Object> config = new HashMap<String, Object>();
+	                    config.put("simulation.checktimeout", 1000);
+	                    return config;
+	                }
+	                
+	                @Override
+	                public Address getNodeAddress() {
+	                    return selfAdr;
+	                }
+
+	                @Override
+	                public Class getComponentDefinition() {
+	                    return SimulationObserverTask3_2.class;
 	                }
 
 	                @Override
@@ -217,10 +291,24 @@ public class ScenarioGen {
                  }
              };
              
-             SimulationScenario.StochasticProcess startObserver = new SimulationScenario.StochasticProcess() {
+             SimulationScenario.StochasticProcess startObserverTask2 = new SimulationScenario.StochasticProcess() {
                  {
                  	eventInterArrivalTime(constant(1000));
-                     raise(1, startObserverOp, constant(0));
+                     raise(1, startObserverTask2Op, constant(0));
+                 }
+             };
+             
+             SimulationScenario.StochasticProcess startObserverTask3_1 = new SimulationScenario.StochasticProcess() {
+                 {
+                 	eventInterArrivalTime(constant(1000));
+                     raise(1, startObserverTask3_1Op, constant(0));
+                 }
+             };
+             
+             SimulationScenario.StochasticProcess startObserverTask3_2 = new SimulationScenario.StochasticProcess() {
+                 {
+                 	eventInterArrivalTime(constant(1000));
+                     raise(1, startObserverTask3_2Op, constant(0));
                  }
              };
              StochasticProcess startNonWriterPeers = new StochasticProcess() {
@@ -245,7 +333,12 @@ public class ScenarioGen {
              startBootstrapServer.startAfterTerminationOf(100, systemSetup);
              startNonWriterPeers.startAfterTerminationOf(100, startBootstrapServer);
              startWriterPeers.startAfterTerminationOf(1000, startNonWriterPeers);
-             startObserver.startAfterTerminationOf(1, startWriterPeers);
+             // Simulation Observer for Task 2
+             //startObserverTask2.startAfterTerminationOf(1, startWriterPeers);
+             // Simulation Observer for Task 3.1
+             //startObserverTask3_1.startAfterTerminationOf(1, startWriterPeers);
+             // Simulation Observer for Task 3.2
+             startObserverTask3_2.startAfterTerminationOf(1, startWriterPeers);
              terminateAfterTerminationOf(100000, setup);
 
          }
