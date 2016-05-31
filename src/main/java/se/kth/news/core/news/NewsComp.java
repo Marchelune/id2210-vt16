@@ -329,7 +329,7 @@ public class NewsComp extends ComponentDefinition {
 					trigger(msg, networkPort);
 				}
 				
-				//comiting after to ensure uniformity ... I guess
+				//commiting after to ensure uniformity ... I guess
 				currentNewsTimestamp++;
 				newsChain.add(newNews);
 				updateLocalNewsView();

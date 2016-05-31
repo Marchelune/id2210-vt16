@@ -110,13 +110,14 @@ public class SimulationObserverTask3_2 extends ComponentDefinition  {
         		}
         		
         		// Node Knowledge
-        		LOG.info(" Node Knowledge: The node '{}' has received {} % of the news.\n", addr.toString(), nbNewsNode*100/max);
+        		//LOG.info(" Node Knowledge: The node '{}' has received {} news items in its news chain.", addr.toString(), nbNewsNode);
+        		//LOG.info(" Node Knowledge: The node '{}' has received {} % of the news items in its news chain.", addr.toString(), nbNewsNode*100/max);
         		avgNodeKnow = avgNodeKnow + nbNewsNode*100/max;
         	}
         	
         	// News coverage
         	for(int i = 0; i< max; i++){
-        		LOG.info(" News Coverage: The news item number '{}' was received by {} % of the nodes.", i, newsCoverage[i]*100/totalNbNodes);
+        		//LOG.info(" News Coverage: The news item number '{}' was received by {} % of the nodes.", i, newsCoverage[i]*100/totalNbNodes);
         		avgNewsCov = avgNewsCov + newsCoverage[i]*100/totalNbNodes;
         	}
         	avgNewsCov = avgNewsCov/max;
