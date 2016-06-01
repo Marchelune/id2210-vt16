@@ -388,7 +388,7 @@ public class ScenarioGen {
                  	
                      eventInterArrivalTime(uniform(1, 50));
 
-                     raise(12, startNodeOp, new BasicIntSequentialDistribution(5), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
+                     raise(48, startNodeOp, new BasicIntSequentialDistribution(17), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
                  }
              };
              StochasticProcess startWriterPeers = new StochasticProcess() {
@@ -396,13 +396,13 @@ public class ScenarioGen {
                  	
                      eventInterArrivalTime(uniform(1, 50));
 
-                     raise(4, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
+                     raise(16, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
                  }
              };
              SimulationScenario.StochasticProcess killLeaderNode = new SimulationScenario.StochasticProcess() {
                  {
                  	eventInterArrivalTime(constant(1000));
-                     raise(1, killNodeOp, constant(16));
+                     raise(1, killNodeOp, constant(64));
                  }
              };
              setup.start();
