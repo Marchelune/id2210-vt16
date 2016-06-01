@@ -388,7 +388,7 @@ public class ScenarioGen {
                  	
                      eventInterArrivalTime(uniform(1, 50));
 
-                     raise(48, startNodeOp, new BasicIntSequentialDistribution(17), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
+                     raise(188, startNodeOp, new BasicIntSequentialDistribution(63), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
                  }
              };
              StochasticProcess startWriterPeers = new StochasticProcess() {
@@ -396,7 +396,7 @@ public class ScenarioGen {
                  	
                      eventInterArrivalTime(uniform(1, 50));
 
-                     raise(16, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
+                     raise(62, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
                  }
              };
              SimulationScenario.StochasticProcess killLeaderNode = new SimulationScenario.StochasticProcess() {
@@ -412,15 +412,15 @@ public class ScenarioGen {
              startNonWriterPeers.startAfterTerminationOf(100, startBootstrapServer);
              startWriterPeers.startAfterTerminationOf(1000, startNonWriterPeers);
              // Simulation Observer for Task 2
-             //startObserverTask2.startAfterTerminationOf(1, startWriterPeers);
+             startObserverTask2.startAfterTerminationOf(1, startWriterPeers);
              // Simulation Observer for Task 3.1
              //startObserverTask3_1.startAfterTerminationOf(1, startWriterPeers);
              // Simulation Observer for Task 3.2
              //startObserverTask3_2.startAfterTerminationOf(1, startWriterPeers);
              // SimulationObserver for Task 4.1
-             startObserverTask4_1.startAfterTerminationOf(1, startWriterPeers);
-             killLeaderNode.startAfterTerminationOf(60000, startWriterPeers);
-             terminateAfterTerminationOf(400000, setup);
+             //startObserverTask4_1.startAfterTerminationOf(1, startWriterPeers);
+             //killLeaderNode.startAfterTerminationOf(60000, startWriterPeers);
+             terminateAfterTerminationOf(200000, setup);
 
          }
      };

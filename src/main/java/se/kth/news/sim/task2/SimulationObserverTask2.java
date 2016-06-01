@@ -81,7 +81,7 @@ private static final Logger LOG = LoggerFactory.getLogger(SimulationObserverTask
         
     	// Number of nodes for which the gradient never converged
     	Integer neverCv = 0;
-    	
+    	Integer nbNodesCv = 0;
     	double avg = 0;
     	Set<KAddress> nodeAddrs = maxCvTimeStore.Store.keySet();
     	double totalNbNodes = (double) nodeAddrs.size();
@@ -95,14 +95,21 @@ private static final Logger LOG = LoggerFactory.getLogger(SimulationObserverTask
     		if(maxCvTimeNode < 5){ // cf STABILITY_ROUNDS_THRESHOLD = 5 in LeaderSelectComp
     			neverCv++;
     		}
-    		LOG.info(" Convergence Time: The gradient for the node '{}' converged in maximum {} rounds .\n", addr.toString(), maxCvTimeNode);
-
-    		avg =  avg + (double) maxCvTimeNode; 
+    		//LOG.info(" Convergence Time: The gradient for the node '{}' converged in maximum {} rounds .\n", addr.toString(), maxCvTimeNode);
+    		if(maxCvTimeNode >= 5){
+    			avg =  avg + (double) maxCvTimeNode;
+    			nbNodesCv++;
+    		}
     	}
-		avg = avg/totalNbNodes;
+		
+		if(nbNodesCv >0){
+			avg = avg/(nbNodesCv);
+		}
 		LOG.info(" Convergence Time: Total number of nodes {}.", totalNbNodes);
-		LOG.info(" Convergence Time: For {} nodes, the gradient has never converged \n", neverCv);
-		LOG.info(" Convergence Time: On average, the gradient for the nodes converged in maximum {} rounds \n", avg);
+		LOG.info(" Convergence Time: For {} nodes, the gradient has never converged.", neverCv);
+		LOG.info(" Convergence Time: For {} nodes, the gradient has converged at least once.", nbNodesCv);
+		LOG.info(" Convergence Time: On average, the gradient for these nodes converged in maximum {} rounds \n", avg);
+    	
     }
     
 }
