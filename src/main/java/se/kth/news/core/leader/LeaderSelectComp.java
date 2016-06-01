@@ -32,6 +32,7 @@ import se.kth.news.core.news.util.NewsView;
 import se.kth.news.core.news.util.NewsViewComparator;
 import se.kth.news.sim.GlobalNewsStore;
 import se.kth.news.sim.task2.MaxCvTimeStore;
+import se.kth.news.sim.task4.leaderStore;
 import se.sics.kompics.ClassMatchedHandler;
 import se.sics.kompics.ComponentDefinition;
 import se.sics.kompics.Handler;
@@ -126,16 +127,22 @@ public class LeaderSelectComp extends ComponentDefinition {
 		MaxCvTimeStore gotLeaderStore = gv.getValue("simulation.gotLeaderStore", MaxCvTimeStore.class);
 		MaxCvTimeStore nbRoundsWhenLeaderElectStore = gv.getValue("simulation.nbRoundsWhenLeaderElectStore", MaxCvTimeStore.class);
 		MaxCvTimeStore nbPullRoundsStore = gv.getValue("simulation.nbPullRoundsStore", MaxCvTimeStore.class);
+		leaderStore leaderStore = gv.getValue("simulation.leaderStore", leaderStore.class);
+		MaxCvTimeStore leaderFailureStore = gv.getValue("simulation.leaderFailureStore", MaxCvTimeStore.class);
+		
 		try{
 			maxCvTimeStore.Store.put(selfAdr, maxNbRoundsToConverge);
 			// We put -1 in the store to indicate we do not have a leader yet (Task 3.1)
 			gotLeaderStore.Store.put(selfAdr, -1);
 			nbRoundsWhenLeaderElectStore.Store.put(selfAdr, 0);
 			nbPullRoundsStore.Store.put(selfAdr, 0);
+			leaderStore.Store.put(selfAdr, currentLeader);
+			// We put -1 in the store to indicate we have not detected a leader failure yet (Task 4.1)
+			leaderFailureStore.Store.put(selfAdr, -1);
 		}catch(Exception e){
 			e.printStackTrace();
 		}
-		
+
 		
 		
 		subscribe(handleStart, control);
@@ -305,6 +312,9 @@ public class LeaderSelectComp extends ComponentDefinition {
 				GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
 				MaxCvTimeStore gotLeaderStore = gv.getValue("simulation.gotLeaderStore", MaxCvTimeStore.class);
 				gotLeaderStore.Store.put(selfAdr, numberOfPullsUntilGetLeader);
+				
+				// Task 4.1
+				shareNewLeaderToGlobalView();
 			}
 		}
 	};
@@ -317,11 +327,17 @@ public class LeaderSelectComp extends ComponentDefinition {
 		public void handle(Suspect event) {
 			if(!event.suspected.equals(currentLeader)) return;
 			currentLeader=null;
+			
+			// Task 4.1
+			shareNewLeaderToGlobalView();
+			shareDetectLeaderFailureGlobalView();
 
 			//Close nodes to the leader were not pulling
 			//So we set a new timer to pull, starting in long enough to avoid pulling the leader we just suspected
 			//because our finger is too slow at detecting crashes.
-			SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(8000, LEADER_PULL_PERIOD);
+			
+			
+			SchedulePeriodicTimeout spt = new SchedulePeriodicTimeout(200000, LEADER_PULL_PERIOD);
 			Timeout timeout = new LeaderPullTimeOut(spt);
 			spt.setTimeoutEvent(timeout);
 			trigger(spt, timerPort);
@@ -361,6 +377,9 @@ public class LeaderSelectComp extends ComponentDefinition {
 				broadcastToNodes(content, currentNeighboursSample); //UNCOMMENT
 			}
 			trigger(content,leaderUpdate);
+			
+			// Task 4.1
+			shareNewLeaderToGlobalView();
 		}
 	};
 	
@@ -383,6 +402,20 @@ public class LeaderSelectComp extends ComponentDefinition {
 		protected LeaderPullTimeOut(SchedulePeriodicTimeout request) {
 			super(request);
 		}
+	}
+	
+	private void shareNewLeaderToGlobalView(){
+		// Simulation - Task 4.1
+		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+		leaderStore leaderStore = gv.getValue("simulation.leaderStore", leaderStore.class);
+		leaderStore.Store.put(selfAdr, currentLeader);
+	}
+	
+	private void shareDetectLeaderFailureGlobalView(){
+		// Simulation - Task 4.1
+		GlobalView gv = config().getValue("simulation.globalview", GlobalView.class);
+		MaxCvTimeStore leaderFailureStore = gv.getValue("simulation.leaderFailureStore", MaxCvTimeStore.class);
+		leaderFailureStore.Store.put(selfAdr, 1);
 	}
 
 	public static class Init extends se.sics.kompics.Init<LeaderSelectComp> {

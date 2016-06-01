@@ -28,6 +28,8 @@ import se.kth.news.sim.ScenarioSetup;
 import se.kth.news.sim.compatibility.SimNodeIdExtractor;
 import se.kth.news.sim.task3.SimulationObserverTask3_1;
 import se.kth.news.sim.task3.SimulationObserverTask3_2;
+import se.kth.news.sim.task4.SimulationObserverTask4_1;
+import se.kth.news.sim.task4.leaderStore;
 import se.kth.news.system.HostMngrComp;
 import se.sics.kompics.Init;
 import se.sics.kompics.network.Address;
@@ -39,6 +41,7 @@ import se.sics.kompics.simulator.adaptor.Operation3;
 import se.sics.kompics.simulator.adaptor.distributions.ConstantDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.IntegerUniformDistribution;
 import se.sics.kompics.simulator.adaptor.distributions.extra.BasicIntSequentialDistribution;
+import se.sics.kompics.simulator.events.system.KillNodeEvent;
 import se.sics.kompics.simulator.events.system.SetupEvent;
 import se.sics.kompics.simulator.events.system.StartNodeEvent;
 import se.sics.kompics.simulator.network.identifier.IdentifierExtractor;
@@ -69,7 +72,11 @@ public class ScenarioGen {
 	                		// Task 3.2
 	                		// Store to save how many news items a node has in its news chain
 	                		gv.setValue("simulation.nbNewsStore", new MaxCvTimeStore());
-	                		
+	                		// Task 4.1
+	                		// Store to save the leader for each node
+	                		gv.setValue("simulation.leaderStore", new leaderStore());
+	                		// Store to save which nodes detected a leader failure
+	                		gv.setValue("simulation.leaderFailureStore", new MaxCvTimeStore());
 	                }
 	            };
 	        }
@@ -179,6 +186,41 @@ public class ScenarioGen {
 	            };
 	        }
 	    };
+	    
+	    static Operation1 startObserverTask4_1Op = new Operation1<StartNodeEvent, Long>() {
+	        public StartNodeEvent generate(final Long nodeId) {
+	            return new StartNodeEvent() {
+	            	KAddress selfAdr;
+	            	int nodeIdInt = toIntExact(nodeId);
+
+	                {
+	                	selfAdr = ScenarioSetup.getNodeAdr(nodeIdInt);
+	                }
+
+	                @Override
+	                public Map<String, Object> initConfigUpdate() {
+	                    HashMap<String, Object> config = new HashMap<String, Object>();
+	                    config.put("simulation.checktimeout", 1);
+	                    return config;
+	                }
+	                
+	                @Override
+	                public Address getNodeAddress() {
+	                    return selfAdr;
+	                }
+
+	                @Override
+	                public Class getComponentDefinition() {
+	                    return SimulationObserverTask4_1.class;
+	                }
+
+	                @Override
+	                public Init getComponentInit() {
+	                    return Init.NONE;
+	                }
+	            };
+	        }
+	    };
 
  static Operation<SetupEvent> systemSetupOp = new Operation<SetupEvent>() {
      @Override
@@ -268,6 +310,29 @@ public class ScenarioGen {
      }
  };
  
+ static Operation1 killNodeOp = new Operation1<KillNodeEvent, Long>() {
+     @Override
+     public KillNodeEvent generate(final Long nodeId) {
+             return new KillNodeEvent() {
+	            	KAddress selfAdr;
+	            	int nodeIdInt = toIntExact(nodeId);
+
+	                {
+	                	selfAdr = ScenarioSetup.getNodeAdr(nodeIdInt);
+	                }
+                     @Override
+                     public Address getNodeAddress() {
+                             return selfAdr;
+                     }
+
+                     @Override
+                     public String toString() {
+                             return "KillNode<" + selfAdr.toString() + ">";
+                     }
+             };
+     }
+};
+ 
  public static SimulationScenario simpleBoot() {
  	final Random rnd = new Random();
      SimulationScenario scen = new SimulationScenario() {
@@ -311,12 +376,19 @@ public class ScenarioGen {
                      raise(1, startObserverTask3_2Op, constant(0));
                  }
              };
+             
+             SimulationScenario.StochasticProcess startObserverTask4_1 = new SimulationScenario.StochasticProcess() {
+                 {
+                 	eventInterArrivalTime(constant(1000));
+                     raise(1, startObserverTask4_1Op, constant(0));
+                 }
+             };
              StochasticProcess startNonWriterPeers = new StochasticProcess() {
                  {
                  	
                      eventInterArrivalTime(uniform(1, 50));
 
-                     raise(188, startNodeOp, new BasicIntSequentialDistribution(63), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
+                     raise(12, startNodeOp, new BasicIntSequentialDistribution(5), new IntegerUniformDistribution(1000,5000,rnd), constant(0));
                  }
              };
              StochasticProcess startWriterPeers = new StochasticProcess() {
@@ -324,7 +396,13 @@ public class ScenarioGen {
                  	
                      eventInterArrivalTime(uniform(1, 50));
 
-                     raise(62, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
+                     raise(4, startNodeOp, new BasicIntSequentialDistribution(1), new IntegerUniformDistribution(1000,5000,rnd), constant(1));
+                 }
+             };
+             SimulationScenario.StochasticProcess killLeaderNode = new SimulationScenario.StochasticProcess() {
+                 {
+                 	eventInterArrivalTime(constant(1000));
+                     raise(1, killNodeOp, constant(16));
                  }
              };
              setup.start();
@@ -338,7 +416,10 @@ public class ScenarioGen {
              // Simulation Observer for Task 3.1
              //startObserverTask3_1.startAfterTerminationOf(1, startWriterPeers);
              // Simulation Observer for Task 3.2
-             startObserverTask3_2.startAfterTerminationOf(1, startWriterPeers);
+             //startObserverTask3_2.startAfterTerminationOf(1, startWriterPeers);
+             // SimulationObserver for Task 4.1
+             startObserverTask4_1.startAfterTerminationOf(1, startWriterPeers);
+             killLeaderNode.startAfterTerminationOf(60000, startWriterPeers);
              terminateAfterTerminationOf(400000, setup);
 
          }
