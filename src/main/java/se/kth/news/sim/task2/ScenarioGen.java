@@ -411,6 +411,8 @@ public class ScenarioGen {
              startBootstrapServer.startAfterTerminationOf(100, systemSetup);
              startNonWriterPeers.startAfterTerminationOf(100, startBootstrapServer);
              startWriterPeers.startAfterTerminationOf(1000, startNonWriterPeers);
+             
+             // Uncomment accordingly to launch the observer for the corresponding task
              // Simulation Observer for Task 2
              startObserverTask2.startAfterTerminationOf(1, startWriterPeers);
              // Simulation Observer for Task 3.1
